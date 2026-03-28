@@ -1,23 +1,60 @@
+import { FileText, Download } from "lucide-react";
+
+const REPORTS = [
+  { id: "r1", type: "kyc_complete", entity: "Elena Vasquez", case: "KYC-2026-0003", date: "2026-01-10", status: "generated" },
+  { id: "r2", type: "amsf_export", entity: null, case: null, date: "2026-03-01", status: "generated" },
+];
+
 export default function ReportsPage() {
   return (
     <div>
-      <div className="mb-6 flex flex-wrap gap-2">
-        <button className="rounded-full bg-foreground px-3.5 py-1.5 text-[12px] font-medium text-background">
-          Tous
-        </button>
-        <button className="rounded-full px-3.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-          KYC complet
-        </button>
-        <button className="rounded-full px-3.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-          Export AMSF
-        </button>
+      <div className="mb-3 flex gap-6 border-b border-border pb-2">
+        <div>
+          <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">Rapports</span>
+          <p className="font-data text-[18px] font-semibold">{REPORTS.length}</p>
+        </div>
       </div>
 
-      <div className="rounded-lg bg-secondary/30 py-12 text-center">
-        <p className="text-[13px] text-muted-foreground">Aucun rapport</p>
-        <p className="mt-1 text-[11px] text-muted-foreground/60">
-          Les rapports seront générés à partir des dossiers KYC
-        </p>
+      <div className="mb-2 flex items-center gap-1">
+        <button className="rounded bg-foreground px-2 py-0.5 text-[11px] text-background">Tous</button>
+        <button className="rounded px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-secondary">KYC complet</button>
+        <button className="rounded px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-secondary">Export AMSF</button>
+      </div>
+
+      <div className="overflow-x-auto rounded border border-border">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border bg-muted/50">
+              <th className="px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Rapport</th>
+              <th className="px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Entité / Dossier</th>
+              <th className="w-24 px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Date</th>
+              <th className="w-16 px-2 py-1.5 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground" />
+            </tr>
+          </thead>
+          <tbody>
+            {REPORTS.map((r) => (
+              <tr key={r.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[11px] font-medium text-foreground">
+                      {r.type === "kyc_complete" ? "Rapport KYC complet" : "Export AMSF"}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground">
+                  {r.entity ?? "—"}{r.case && <span className="ml-1 font-data">({r.case})</span>}
+                </td>
+                <td className="px-2 py-1.5 font-data text-[10px] text-muted-foreground">{new Date(r.date).toLocaleDateString("fr-FR")}</td>
+                <td className="px-2 py-1.5 text-right">
+                  <button className="rounded border border-border p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    <Download className="h-3 w-3" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

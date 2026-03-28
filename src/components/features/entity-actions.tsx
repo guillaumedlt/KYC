@@ -1,87 +1,29 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  FolderOpen,
-  Search,
-  Zap,
-  Upload,
-  Link2,
-  MoreHorizontal,
-} from "lucide-react";
+import { FolderOpen, Search, Zap, Upload, Link2 } from "lucide-react";
 
-interface EntityActionsProps {
-  entityId: string;
-  entityName: string;
-  hasOpenCase: boolean;
-}
+interface Props { entityId: string; entityName: string; hasOpenCase: boolean }
 
-export function EntityActions({
-  entityId,
-  entityName,
-  hasOpenCase,
-}: EntityActionsProps) {
+export function EntityActions({ entityId, entityName, hasOpenCase }: Props) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex gap-1">
       {!hasOpenCase && (
-        <Button
-          size="sm"
-          className="h-7 rounded-full px-3 text-[12px]"
-          onClick={() => {
-            // TODO: Server action → create KYC case
-          }}
-        >
-          <FolderOpen className="mr-1.5 h-3 w-3" />
-          Ouvrir un dossier KYC
+        <Button size="sm" className="h-6 rounded px-2 text-[10px]">
+          <FolderOpen className="mr-1 h-3 w-3" />KYC
         </Button>
       )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 rounded-full px-3 text-[12px]"
-        onClick={() => {
-          // TODO: Trigger screening
-        }}
-      >
-        <Search className="mr-1.5 h-3 w-3" />
-        Screening
+      <Button variant="outline" size="sm" className="h-6 rounded px-2 text-[10px]">
+        <Search className="mr-1 h-3 w-3" />Screen
       </Button>
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 rounded-full px-3 text-[12px]"
-        onClick={() => {
-          // TODO: Trigger risk computation
-        }}
-      >
-        <Zap className="mr-1.5 h-3 w-3" />
-        Évaluer le risque
+      <Button variant="outline" size="sm" className="h-6 rounded px-2 text-[10px]">
+        <Zap className="mr-1 h-3 w-3" />Risque
       </Button>
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 rounded-full px-3 text-[12px]"
-        onClick={() => {
-          // TODO: Open document upload
-        }}
-      >
-        <Upload className="mr-1.5 h-3 w-3" />
-        Document
+      <Button variant="outline" size="sm" className="h-6 rounded px-2 text-[10px]">
+        <Upload className="mr-1 h-3 w-3" />Doc
       </Button>
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 rounded-full px-3 text-[12px]"
-        onClick={() => {
-          // TODO: Add relation
-        }}
-      >
-        <Link2 className="mr-1.5 h-3 w-3" />
-        Relation
+      <Button variant="outline" size="sm" className="h-6 rounded px-2 text-[10px]">
+        <Link2 className="mr-1 h-3 w-3" />Lien
       </Button>
     </div>
   );

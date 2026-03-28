@@ -1,83 +1,44 @@
 export default function SettingsPage() {
   return (
-    <div className="max-w-2xl">
-      <div className="mb-8">
-        <span className="mb-4 block text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-          Général
-        </span>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-4 py-3">
-            <div>
-              <p className="text-[13px] font-medium text-foreground">
-                Organisation
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Nom, type et informations du tenant
-              </p>
-            </div>
-            <span className="text-[12px] text-muted-foreground">
-              Non configuré
-            </span>
-          </div>
-          <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-4 py-3">
-            <div>
-              <p className="text-[13px] font-medium text-foreground">
-                Utilisateurs
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Gérer les membres et les rôles
-              </p>
-            </div>
-            <span className="font-data text-[12px] text-muted-foreground">
-              0
-            </span>
-          </div>
-          <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-4 py-3">
-            <div>
-              <p className="text-[13px] font-medium text-foreground">
-                Supabase
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Connexion base de données
-              </p>
-            </div>
-            <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
-              Déconnecté
-            </span>
-          </div>
-        </div>
-      </div>
+    <div className="max-w-lg space-y-4">
+      <Section title="Général">
+        <Row label="Organisation" value="Non configuré" />
+        <Row label="Utilisateurs" value="0" mono />
+        <Row label="Supabase" value="Connecté" tag="fjwzus...kdqi" />
+      </Section>
+      <Section title="Compliance">
+        <Row label="Politique de vigilance" value="Défaut AMSF" />
+        <Row label="Listes de screening" value="4 listes" mono tag="UN, EU, MC, OFAC" />
+        <Row label="Rétention audit" value="7 ans" mono />
+        <Row label="Conservation documents" value="5 ans post-relation" mono />
+      </Section>
+      <Section title="IA">
+        <Row label="Modèle extraction" value="Claude Sonnet 4" />
+        <Row label="Modèle screening" value="Claude Opus 4" />
+        <Row label="Auto-classification" value="Activé" />
+      </Section>
+    </div>
+  );
+}
 
-      <div>
-        <span className="mb-4 block text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-          Compliance
-        </span>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-4 py-3">
-            <div>
-              <p className="text-[13px] font-medium text-foreground">
-                Politique de vigilance
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Seuils et niveaux de risque
-              </p>
-            </div>
-            <span className="text-[12px] text-muted-foreground">Défaut</span>
-          </div>
-          <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-4 py-3">
-            <div>
-              <p className="text-[13px] font-medium text-foreground">
-                Listes de screening
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                ONU, UE, Monaco, OFAC
-              </p>
-            </div>
-            <span className="font-data text-[12px] text-muted-foreground">
-              4 listes
-            </span>
-          </div>
-        </div>
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <span className="mb-2 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{title}</span>
+      <div className="rounded border border-border divide-y divide-border">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value, mono, tag }: { label: string; value: string; mono?: boolean; tag?: string }) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2">
+      <span className="text-[11px] text-foreground">{label}</span>
+      <div className="flex items-center gap-2">
+        {tag && <span className="font-data text-[9px] text-muted-foreground">{tag}</span>}
+        <span className={`text-[11px] text-muted-foreground ${mono ? "font-data" : ""}`}>{value}</span>
       </div>
     </div>
   );
