@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Search, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -15,15 +16,23 @@ const PAGE_TITLES: Record<string, string> = {
   "/settings": "Paramètres",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  compliance_officer: "CO",
+  analyst: "Analyste",
+  viewer: "Lecteur",
+};
+
 function triggerCmdK() {
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
 }
 
-export function Header() {
+export function Header({ userName, userRole }: { userName: string; userRole: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const base = "/" + (pathname.split("/")[1] ?? "");
   const title = PAGE_TITLES[base] ?? "";
+  const initials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   async function handleLogout() {
     const supabase = createClient();
@@ -46,6 +55,18 @@ export function Header() {
           <span className="hidden sm:inline">Rechercher...</span>
           <kbd className="ml-1 font-mono text-[9px] text-muted-foreground/50">⌘K</kbd>
         </button>
+
+        {/* User badge */}
+        <div className="flex items-center gap-1.5">
+          <div className="h-6 w-6 rounded bg-foreground text-center text-[10px] font-medium leading-6 text-background">
+            {initials}
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-[10px] font-medium leading-none text-foreground">{userName}</p>
+            <p className="text-[9px] leading-none text-muted-foreground">{ROLE_LABELS[userRole] ?? userRole}</p>
+          </div>
+        </div>
+
         <button
           onClick={handleLogout}
           title="Déconnexion"
