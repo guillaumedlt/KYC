@@ -54,9 +54,12 @@ export default function CasesPage() {
                   className="border-b border-border/50 transition-colors last:border-0 hover:bg-secondary/30"
                 >
                   <td className="px-4 py-2.5">
-                    <span className="font-data text-[13px] font-medium text-foreground">
+                    <Link
+                      href={`/cases/${kycCase.id}`}
+                      className="font-data text-[13px] font-medium text-foreground hover:underline"
+                    >
                       {kycCase.case_number}
-                    </span>
+                    </Link>
                   </td>
                   <td className="px-4 py-2.5">
                     {entity && (
