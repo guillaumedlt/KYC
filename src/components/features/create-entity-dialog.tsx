@@ -89,7 +89,7 @@ export function CreateEntityDialog() {
     >
       <DialogTrigger
         render={
-          <Button size="sm" className="h-7 rounded-full px-3 text-[12px]">
+          <Button size="sm" className="h-6 rounded px-2 text-[10px]">
             <Plus className="mr-1 h-3 w-3" />
             Ajouter
           </Button>
