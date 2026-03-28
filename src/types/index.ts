@@ -147,6 +147,10 @@ export interface EntityPerson {
   date_of_birth: string | null;
   nationality: string | null;
   country_of_residence: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  profession: string | null;
   is_pep: boolean;
   pep_details: Record<string, unknown> | null;
 }
@@ -160,6 +164,11 @@ export interface EntityCompany {
   incorporation_date: string | null;
   company_type: CompanyType | null;
   industry: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  capital: string | null;
 }
 
 export interface EntityRelation {
