@@ -9,6 +9,7 @@ import {
   MOCK_ENTITIES,
 } from "@/lib/mock-data";
 import { KycStatusBadge, RiskBadge, CaseStatusBadge } from "@/components/features/status-badge";
+import { EntityActions } from "@/components/features/entity-actions";
 import type { RiskLevel } from "@/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -54,7 +55,7 @@ export default async function EntityDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-foreground text-[15px] font-semibold text-background">
             {entity.display_name.charAt(0)}
@@ -86,6 +87,17 @@ export default async function EntityDetailPage({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="mb-8">
+        <EntityActions
+          entityId={id}
+          entityName={entity.display_name}
+          hasOpenCase={cases.some(
+            (c) => !["approved", "rejected", "closed"].includes(c.status),
+          )}
+        />
       </div>
 
       {/* Content grid */}
