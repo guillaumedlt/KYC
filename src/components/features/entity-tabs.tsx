@@ -82,7 +82,7 @@ export function EntityTabs(props: Props) {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 border-b-2 px-4 py-2.5 text-[12px] transition-colors",
+                "flex shrink-0 items-center gap-1 border-b-2 px-3 py-1.5 text-[11px] transition-colors",
                 tab === t.key
                   ? "border-foreground font-medium text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
@@ -122,7 +122,7 @@ function InfoTab({ person, company, riskFactors }: Props) {
       {person && (
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               <User className="h-3 w-3 text-blue-500" />
               Identité
             </span>
@@ -175,7 +175,7 @@ function InfoTab({ person, company, riskFactors }: Props) {
       {company && (
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               <Building2 className="h-3 w-3 text-violet-500" />
               Société
             </span>
@@ -220,12 +220,12 @@ function InfoTab({ person, company, riskFactors }: Props) {
       {/* Risk factors */}
       {riskFactors.length > 0 && (
         <div>
-          <span className="mb-3 block text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          <span className="mb-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Facteurs de risque · <span className="font-data">{riskFactors.reduce((s, f) => s + f.impact, 0)} pts</span>
           </span>
           <div className="space-y-1.5">
             {riskFactors.map((f, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-lg bg-secondary/40 px-4 py-2">
+              <div key={i} className="flex items-center gap-3 rounded bg-muted/40 px-3 py-1.5">
                 <span className={cn(
                   "w-8 font-data text-[12px] font-semibold",
                   f.impact >= 20 ? "text-red-600" : f.impact >= 10 ? "text-amber-600" : "text-muted-foreground",
@@ -312,7 +312,7 @@ function RelationsTab({ relations, entityId, allEntities }: Props) {
         const other = allEntities.find((e) => e.id === otherId);
         const isCompany = other?.type === "company";
         return (
-          <div key={rel.id} className="flex items-center justify-between rounded-lg bg-secondary/40 px-4 py-3">
+          <div key={rel.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2">
             <div className="flex items-center gap-3">
               <div className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-lg",
@@ -420,7 +420,7 @@ function CasesTab({ cases }: { cases: KycCase[] }) {
     <div className="space-y-2">
       {cases.map((c) => (
         <Link key={c.id} href={`/cases/${c.id}`}
-          className="flex items-center justify-between rounded-lg bg-secondary/40 px-4 py-3 transition-colors hover:bg-secondary/60">
+          className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 transition-colors hover:bg-secondary/60">
           <div>
             <span className="font-data text-[13px] font-medium text-foreground">{c.case_number}</span>
             <p className="mt-0.5 text-[11px] text-muted-foreground">

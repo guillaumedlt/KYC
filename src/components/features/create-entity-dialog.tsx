@@ -107,7 +107,7 @@ export function CreateEntityDialog() {
           <button
             onClick={() => setMode("ai")}
             className={cn(
-              "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] transition-all",
+              "flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] transition-all",
               mode === "ai"
                 ? "bg-foreground font-medium text-background"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -119,7 +119,7 @@ export function CreateEntityDialog() {
           <button
             onClick={() => setMode("manual")}
             className={cn(
-              "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] transition-all",
+              "flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] transition-all",
               mode === "manual"
                 ? "bg-foreground font-medium text-background"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -194,14 +194,14 @@ export function CreateEntityDialog() {
 
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-1">
-              <DialogClose render={<Button variant="ghost" size="sm" className="h-8 text-[12px]" />}>
+              <DialogClose render={<Button variant="ghost" size="sm" className="h-6 text-[10px]" />}>
                 Annuler
               </DialogClose>
               <Button
                 onClick={handleAnalyze}
                 disabled={files.length === 0 || analyzing}
                 size="sm"
-                className="h-8 text-[12px]"
+                className="h-6 text-[10px]"
               >
                 {analyzing ? (
                   <>
@@ -228,7 +228,7 @@ export function CreateEntityDialog() {
                 type="button"
                 onClick={() => setKind("person")}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg border px-4 py-3 text-left text-[13px] transition-all",
+                  "flex items-center gap-2.5 rounded border px-3 py-2 text-left text-[11px] transition-all",
                   kind === "person"
                     ? "border-foreground bg-foreground text-background"
                     : "border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground",
@@ -244,7 +244,7 @@ export function CreateEntityDialog() {
                 type="button"
                 onClick={() => setKind("company")}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg border px-4 py-3 text-left text-[13px] transition-all",
+                  "flex items-center gap-2.5 rounded border px-3 py-2 text-left text-[11px] transition-all",
                   kind === "company"
                     ? "border-foreground bg-foreground text-background"
                     : "border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground",
@@ -263,19 +263,19 @@ export function CreateEntityDialog() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="firstName" className="text-[12px]">Prénom</Label>
-                  <Input id="firstName" placeholder="Jean-Pierre" required className="h-9 text-[13px]" />
+                  <Input id="firstName" placeholder="Jean-Pierre" required className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="lastName" className="text-[12px]">Nom</Label>
-                  <Input id="lastName" placeholder="Moretti" required className="h-9 text-[13px]" />
+                  <Input id="lastName" placeholder="Moretti" required className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="nationality" className="text-[12px]">Nationalité</Label>
-                  <Input id="nationality" placeholder="FR" className="h-9 text-[13px]" />
+                  <Input id="nationality" placeholder="FR" className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="residence" className="text-[12px]">Résidence</Label>
-                  <Input id="residence" placeholder="MC" className="h-9 text-[13px]" />
+                  <Input id="residence" placeholder="MC" className="h-7 text-[11px]" />
                 </div>
               </div>
             )}
@@ -285,7 +285,7 @@ export function CreateEntityDialog() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-1.5">
                   <Label htmlFor="legalName" className="text-[12px]">Raison sociale</Label>
-                  <Input id="legalName" placeholder="Monaco Trading SAM" required className="h-9 text-[13px]" />
+                  <Input id="legalName" placeholder="Monaco Trading SAM" required className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="regNumber" className="text-[12px]">N° registre</Label>
@@ -293,15 +293,15 @@ export function CreateEntityDialog() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="jurisdiction" className="text-[12px]">Juridiction</Label>
-                  <Input id="jurisdiction" placeholder="MC" className="h-9 text-[13px]" />
+                  <Input id="jurisdiction" placeholder="MC" className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="companyType" className="text-[12px]">Forme</Label>
-                  <Input id="companyType" placeholder="SAM, SARL, SCI..." className="h-9 text-[13px]" />
+                  <Input id="companyType" placeholder="SAM, SARL, SCI..." className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="industry" className="text-[12px]">Secteur</Label>
-                  <Input id="industry" placeholder="Finance, Immobilier..." className="h-9 text-[13px]" />
+                  <Input id="industry" placeholder="Finance, Immobilier..." className="h-7 text-[11px]" />
                 </div>
               </div>
             )}
@@ -341,10 +341,10 @@ export function CreateEntityDialog() {
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
-              <DialogClose render={<Button type="button" variant="ghost" size="sm" className="h-8 text-[12px]" />}>
+              <DialogClose render={<Button type="button" variant="ghost" size="sm" className="h-6 text-[10px]" />}>
                 Annuler
               </DialogClose>
-              <Button type="submit" size="sm" className="h-8 text-[12px]">
+              <Button type="submit" size="sm" className="h-6 text-[10px]">
                 Créer l&apos;entité
               </Button>
             </div>
