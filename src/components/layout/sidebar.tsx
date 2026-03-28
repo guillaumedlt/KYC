@@ -13,36 +13,27 @@ import {
   FileText,
   ClipboardList,
   Settings,
-  ChevronsLeft,
-  ChevronsRight,
+  ChevronLeft,
+  ChevronRight,
   Menu,
   X,
 } from "lucide-react";
 
-const NAV_SECTIONS = [
-  {
-    label: "Overview",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: "CRM",
-    items: [
-      { href: "/entities", label: "Entités", icon: Users },
-      { href: "/cases", label: "Dossiers", icon: FolderOpen },
-      { href: "/documents", label: "Documents", icon: FileText },
-    ],
-  },
-  {
-    label: "Compliance",
-    items: [
-      { href: "/screening", label: "Screening", icon: Search },
-      { href: "/risk", label: "Risques", icon: Zap },
-      { href: "/reports", label: "Rapports", icon: ClipboardList },
-    ],
-  },
-] as const;
+const NAV = [
+  { section: null, items: [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  ]},
+  { section: "CRM", items: [
+    { href: "/entities", label: "Entités", icon: Users },
+    { href: "/cases", label: "Dossiers", icon: FolderOpen },
+    { href: "/documents", label: "Documents", icon: FileText },
+  ]},
+  { section: "Compliance", items: [
+    { href: "/screening", label: "Screening", icon: Search },
+    { href: "/risk", label: "Risques", icon: Zap },
+    { href: "/reports", label: "Rapports", icon: ClipboardList },
+  ]},
+];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
@@ -51,77 +42,50 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="fixed left-3 top-3.5 z-40 flex h-8 w-8 items-center justify-center rounded-lg bg-secondary lg:hidden"
+        className="fixed left-2 top-2 z-40 flex h-7 w-7 items-center justify-center rounded bg-secondary text-muted-foreground lg:hidden"
       >
-        <Menu className="h-4 w-4" />
+        <Menu className="h-3.5 w-3.5" />
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
+        <div className="fixed inset-0 z-40 bg-foreground/10" onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          // Mobile: fixed overlay
-          "fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar transition-transform duration-200 ease-out lg:relative lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-          // Desktop: collapsible width
-          collapsed ? "lg:w-[52px]" : "lg:w-[232px]",
-          // Always full width on mobile when open
-          "w-[260px]",
-        )}
-      >
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-150 lg:relative lg:translate-x-0",
+        mobileOpen ? "translate-x-0" : "-translate-x-full",
+        collapsed ? "lg:w-10" : "lg:w-[180px]",
+        "w-[200px]",
+      )}>
         {/* Logo */}
-        <div className="flex h-14 items-center justify-between px-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-foreground">
-              <span className="font-mono text-[11px] font-bold leading-none text-background">
-                K
-              </span>
+        <div className="flex h-10 items-center justify-between border-b border-sidebar-border px-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-foreground">
+              <span className="font-mono text-[9px] font-bold leading-none text-background">K</span>
             </div>
             {!collapsed && (
-              <div className="flex flex-col">
-                <span className="text-[13px] font-semibold leading-none text-foreground">
-                  KYC Monaco
-                </span>
-                <span className="mt-0.5 text-[10px] leading-none text-muted-foreground">
-                  kyc.mc
-                </span>
-              </div>
+              <span className="text-[11px] font-semibold text-foreground">KYC Monaco</span>
             )}
           </div>
-
-          {/* Mobile close */}
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground lg:hidden"
-          >
-            <X className="h-4 w-4" />
+          <button onClick={() => setMobileOpen(false)} className="text-muted-foreground lg:hidden">
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        {/* Nav sections */}
-        <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-2.5 pt-4">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label}>
-              {!collapsed && (
-                <span className="mb-1.5 block px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                  {section.label}
+        {/* Nav */}
+        <nav className="flex flex-1 flex-col gap-3 overflow-y-auto px-1.5 py-2">
+          {NAV.map((group, gi) => (
+            <div key={gi}>
+              {group.section && !collapsed && (
+                <span className="mb-1 block px-1.5 text-[9px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                  {group.section}
                 </span>
               )}
-              <div className="flex flex-col gap-0.5">
-                {section.items.map((item) => {
-                  const isActive =
-                    pathname === item.href ||
-                    pathname.startsWith(item.href + "/");
+              <div className="flex flex-col">
+                {group.items.map((item) => {
+                  const active = pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
                     <Link
                       key={item.href}
@@ -129,16 +93,13 @@ export function Sidebar() {
                       onClick={() => setMobileOpen(false)}
                       title={collapsed ? item.label : undefined}
                       className={cn(
-                        "group flex h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] transition-all duration-150",
-                        isActive
-                          ? "bg-foreground text-background"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                        "flex h-7 items-center gap-2 rounded px-1.5 text-[11px] transition-colors",
+                        active
+                          ? "bg-sidebar-accent font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                       )}
                     >
-                      <item.icon
-                        className="h-[15px] w-[15px] shrink-0"
-                        strokeWidth={isActive ? 2 : 1.5}
-                      />
+                      <item.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={active ? 2 : 1.5} />
                       {!collapsed && <span>{item.label}</span>}
                     </Link>
                   );
@@ -149,32 +110,25 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom */}
-        <div className="flex flex-col gap-0.5 px-2.5 pb-3">
+        <div className="border-t border-sidebar-border px-1.5 py-1.5">
           <Link
             href="/settings"
             onClick={() => setMobileOpen(false)}
             className={cn(
-              "flex h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] transition-all duration-150",
+              "flex h-7 items-center gap-2 rounded px-1.5 text-[11px] transition-colors",
               pathname.startsWith("/settings")
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                ? "bg-sidebar-accent font-medium text-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
             )}
           >
-            <Settings className="h-[15px] w-[15px] shrink-0" strokeWidth={1.5} />
+            <Settings className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
             {!collapsed && <span>Paramètres</span>}
           </Link>
           <button
-            onClick={() => setCollapsed((prev) => !prev)}
-            className="hidden h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] text-muted-foreground transition-all duration-150 hover:bg-accent hover:text-foreground lg:flex"
+            onClick={() => setCollapsed((p) => !p)}
+            className="hidden h-7 w-full items-center gap-2 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground lg:flex"
           >
-            {collapsed ? (
-              <ChevronsRight className="h-[15px] w-[15px] shrink-0" strokeWidth={1.5} />
-            ) : (
-              <>
-                <ChevronsLeft className="h-[15px] w-[15px] shrink-0" strokeWidth={1.5} />
-                <span>Réduire</span>
-              </>
-            )}
+            {collapsed ? <ChevronRight className="h-3 w-3" /> : <><ChevronLeft className="h-3 w-3" /><span>Réduire</span></>}
           </button>
         </div>
       </aside>
