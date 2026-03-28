@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Geist } from "next/font/google";
-import "./globals.css";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+import "./globals.css";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,11 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="fr"
-      className={cn(inter.variable, jetbrainsMono.variable, "font-sans", geist.variable)}
-    >
-      <body className="min-h-screen bg-bg-primary font-sans text-text-primary antialiased">
+    <html lang="fr" className={cn(inter.variable, jetbrainsMono.variable)}>
+      <body className="min-h-screen font-sans antialiased">
         {children}
       </body>
     </html>
