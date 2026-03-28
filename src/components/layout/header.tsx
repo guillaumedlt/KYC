@@ -1,7 +1,8 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Search } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Search, LogOut } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -20,8 +21,16 @@ function triggerCmdK() {
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const base = "/" + (pathname.split("/")[1] ?? "");
   const title = PAGE_TITLES[base] ?? "";
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <header className="flex h-10 items-center justify-between border-b border-border px-3 sm:px-4">
@@ -37,9 +46,13 @@ export function Header() {
           <span className="hidden sm:inline">Rechercher...</span>
           <kbd className="ml-1 font-mono text-[9px] text-muted-foreground/50">⌘K</kbd>
         </button>
-        <div className="h-6 w-6 rounded bg-foreground text-center text-[10px] font-medium leading-6 text-background">
-          G
-        </div>
+        <button
+          onClick={handleLogout}
+          title="Déconnexion"
+          className="rounded border border-border p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <LogOut className="h-3 w-3" />
+        </button>
       </div>
     </header>
   );
