@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { MOCK_ENTITIES } from "@/lib/mock-data";
 import { KycStatusBadge, RiskBadge } from "@/components/features/status-badge";
+import { CreateEntityDialog } from "@/components/features/create-entity-dialog";
 import type { RiskLevel } from "@/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -32,10 +31,7 @@ export default function EntitiesPage() {
             Structures
           </button>
         </div>
-        <Button size="sm" className="h-7 w-fit rounded-full px-3 text-[12px]">
-          <Plus className="mr-1 h-3 w-3" />
-          Ajouter
-        </Button>
+        <CreateEntityDialog />
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">
