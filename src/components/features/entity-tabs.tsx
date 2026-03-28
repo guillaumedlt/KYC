@@ -17,8 +17,10 @@ import {
   X,
   Save,
 } from "lucide-react";
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { CaseStatusBadge } from "@/components/features/status-badge";
+import { updatePerson, updateCompany } from "@/app/actions/entities";
 import { cn } from "@/lib/utils";
 import type {
   EntityPerson,
@@ -113,11 +115,21 @@ export function EntityTabs(props: Props) {
 // INFO TAB — with edit mode
 // =============================================================================
 
-function InfoTab({ person, company, riskFactors }: Props) {
+function InfoTab({ entityId, person, company, riskFactors }: Props) {
   const [editing, setEditing] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  async function handleSave() {
+    if (!formRef.current) return;
+    const formData = new FormData(formRef.current);
+    if (person) await updatePerson(entityId, formData);
+    if (company) await updateCompany(entityId, formData);
+    setEditing(false);
+  }
 
   return (
     <div className="space-y-8">
+      <form ref={formRef}>
       {/* Person info */}
       {person && (
         <div>
@@ -127,28 +139,27 @@ function InfoTab({ person, company, riskFactors }: Props) {
               Identité
             </span>
             <button
-              onClick={() => setEditing(!editing)}
+              type="button"
+              onClick={() => editing ? handleSave() : setEditing(true)}
               className={cn(
-                "flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition-colors",
+                "flex items-center gap-1 rounded px-2 py-0.5 text-[10px] transition-colors",
                 editing
                   ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              {editing ? <X className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-              {editing ? "Annuler" : "Modifier"}
+              {editing ? <><Save className="h-3 w-3" />Enregistrer</> : <><Pencil className="h-3 w-3" />Modifier</>}
             </button>
           </div>
-          <div className="rounded-lg border border-border">
-            <EditableField label="Prénom" value={person.first_name} editing={editing} />
-            <EditableField label="Nom" value={person.last_name} editing={editing} />
-            <EditableField label="Date de naissance" value={person.date_of_birth} editing={editing} mono sensitive />
-            <EditableField label="Nationalité" value={person.nationality ? `${COUNTRY_FLAGS[person.nationality] ?? ""} ${person.nationality}` : null} editing={editing} />
-            <EditableField label="Résidence" value={person.country_of_residence ? `${COUNTRY_FLAGS[person.country_of_residence] ?? ""} ${person.country_of_residence}` : null} editing={editing} />
-            <EditableField label="Adresse" value={person.address} editing={editing} />
-            <EditableField label="Téléphone" value={person.phone} editing={editing} mono sensitive />
-            <EditableField label="Email" value={person.email} editing={editing} />
-            <EditableField label="Profession" value={person.profession} editing={editing} />
+          <div className="rounded border border-border">
+            <EditableField label="Prénom" name="firstName" value={person.first_name} editing={editing} />
+            <EditableField label="Nom" name="lastName" value={person.last_name} editing={editing} />
+            <EditableField label="Nationalité" name="nationality" value={person.nationality} editing={editing} />
+            <EditableField label="Résidence" name="residence" value={person.country_of_residence} editing={editing} />
+            <EditableField label="Adresse" name="address" value={person.address} editing={editing} />
+            <EditableField label="Téléphone" name="phone" value={person.phone} editing={editing} mono sensitive />
+            <EditableField label="Email" name="email" value={person.email} editing={editing} />
+            <EditableField label="Profession" name="profession" value={person.profession} editing={editing} />
             <EditableField label="PEP" value={person.is_pep ? "Oui" : "Non"} editing={false} highlight={person.is_pep} last />
           </div>
           {person.is_pep && person.pep_details && (
@@ -158,14 +169,6 @@ function InfoTab({ person, company, riskFactors }: Props) {
                 {(person.pep_details as Record<string, string>).position}
                 {(person.pep_details as Record<string, string>).since && ` · depuis ${(person.pep_details as Record<string, string>).since}`}
               </p>
-            </div>
-          )}
-          {editing && (
-            <div className="mt-3 flex justify-end">
-              <Button size="sm" className="h-7 text-[12px]" onClick={() => setEditing(false)}>
-                <Save className="mr-1 h-3 w-3" />
-                Enregistrer
-              </Button>
             </div>
           )}
         </div>
@@ -180,42 +183,34 @@ function InfoTab({ person, company, riskFactors }: Props) {
               Société
             </span>
             <button
-              onClick={() => setEditing(!editing)}
+              type="button"
+              onClick={() => editing ? handleSave() : setEditing(true)}
               className={cn(
-                "flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition-colors",
+                "flex items-center gap-1 rounded px-2 py-0.5 text-[10px] transition-colors",
                 editing
                   ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              {editing ? <X className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-              {editing ? "Annuler" : "Modifier"}
+              {editing ? <><Save className="h-3 w-3" />Enregistrer</> : <><Pencil className="h-3 w-3" />Modifier</>}
             </button>
           </div>
-          <div className="rounded-lg border border-border">
-            <EditableField label="Raison sociale" value={company.legal_name} editing={editing} />
-            <EditableField label="Nom commercial" value={company.trading_name} editing={editing} />
-            <EditableField label="N° registre" value={company.registration_number} editing={editing} mono />
-            <EditableField label="Juridiction" value={company.jurisdiction ? `${COUNTRY_FLAGS[company.jurisdiction] ?? ""} ${company.jurisdiction}` : null} editing={editing} />
-            <EditableField label="Forme juridique" value={company.company_type?.toUpperCase()} editing={editing} />
-            <EditableField label="Secteur" value={company.industry} editing={editing} />
-            <EditableField label="Immatriculation" value={company.incorporation_date ? new Date(company.incorporation_date).toLocaleDateString("fr-FR") : null} editing={editing} mono />
-            <EditableField label="Adresse" value={company.address} editing={editing} />
-            <EditableField label="Téléphone" value={company.phone} editing={editing} mono sensitive />
-            <EditableField label="Email" value={company.email} editing={editing} />
-            <EditableField label="Site web" value={company.website} editing={editing} />
-            <EditableField label="Capital" value={company.capital} editing={editing} mono last />
+          <div className="rounded border border-border">
+            <EditableField label="Raison sociale" name="legalName" value={company.legal_name} editing={editing} />
+            <EditableField label="Nom commercial" name="tradingName" value={company.trading_name} editing={editing} />
+            <EditableField label="N° registre" name="regNumber" value={company.registration_number} editing={editing} mono />
+            <EditableField label="Juridiction" name="jurisdiction" value={company.jurisdiction} editing={editing} />
+            <EditableField label="Forme juridique" name="companyType" value={company.company_type} editing={editing} />
+            <EditableField label="Secteur" name="industry" value={company.industry} editing={editing} />
+            <EditableField label="Adresse" name="address" value={company.address} editing={editing} />
+            <EditableField label="Téléphone" name="phone" value={company.phone} editing={editing} mono sensitive />
+            <EditableField label="Email" name="email" value={company.email} editing={editing} />
+            <EditableField label="Site web" name="website" value={company.website} editing={editing} />
+            <EditableField label="Capital" name="capital" value={company.capital} editing={editing} mono last />
           </div>
-          {editing && (
-            <div className="mt-3 flex justify-end">
-              <Button size="sm" className="h-7 text-[12px]" onClick={() => setEditing(false)}>
-                <Save className="mr-1 h-3 w-3" />
-                Enregistrer
-              </Button>
-            </div>
-          )}
         </div>
       )}
+      </form>
 
       {/* Risk factors */}
       {riskFactors.length > 0 && (
@@ -254,12 +249,14 @@ function EditableField({
   label,
   value,
   editing,
+  name,
   mono,
   sensitive,
   highlight,
   last,
 }: {
   label: string;
+  name?: string;
   value: string | null | undefined;
   editing: boolean;
   mono?: boolean;
@@ -276,10 +273,11 @@ function EditableField({
       {editing ? (
         <input
           type="text"
+          name={name}
           defaultValue={value ?? ""}
           placeholder="—"
           className={cn(
-            "flex-1 rounded-md border border-border bg-background px-2 py-1 text-right text-[13px] text-foreground focus:border-foreground focus:outline-none",
+            "flex-1 rounded border border-border bg-background px-2 py-0.5 text-right text-[11px] text-foreground focus:border-foreground focus:outline-none",
             mono && "font-data",
           )}
         />

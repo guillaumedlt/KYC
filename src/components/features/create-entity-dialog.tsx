@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createPerson, createCompany } from "@/app/actions/entities";
 
 type Mode = "ai" | "manual";
 type EntityKind = "person" | "company";
@@ -65,11 +66,14 @@ export function CreateEntityDialog() {
     }, 2000);
   }
 
-  function handleManualSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleManualSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // TODO: Server action → Supabase insert
-    setOpen(false);
-    router.push("/entities");
+    const formData = new FormData(e.currentTarget);
+    if (kind === "person") {
+      await createPerson(formData);
+    } else {
+      await createCompany(formData);
+    }
   }
 
   function resetState() {
@@ -263,19 +267,19 @@ export function CreateEntityDialog() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="firstName" className="text-[12px]">Prénom</Label>
-                  <Input id="firstName" placeholder="Jean-Pierre" required className="h-7 text-[11px]" />
+                  <Input id="firstName" name="firstName" placeholder="Jean-Pierre" required className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="lastName" className="text-[12px]">Nom</Label>
-                  <Input id="lastName" placeholder="Moretti" required className="h-7 text-[11px]" />
+                  <Input id="lastName" name="lastName" placeholder="Moretti" required className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="nationality" className="text-[12px]">Nationalité</Label>
-                  <Input id="nationality" placeholder="FR" className="h-7 text-[11px]" />
+                  <Input id="nationality" name="nationality" placeholder="MC" className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="residence" className="text-[12px]">Résidence</Label>
-                  <Input id="residence" placeholder="MC" className="h-7 text-[11px]" />
+                  <Input id="residence" name="residence" placeholder="MC" className="h-7 text-[11px]" />
                 </div>
               </div>
             )}
@@ -285,23 +289,23 @@ export function CreateEntityDialog() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-1.5">
                   <Label htmlFor="legalName" className="text-[12px]">Raison sociale</Label>
-                  <Input id="legalName" placeholder="Monaco Trading SAM" required className="h-7 text-[11px]" />
+                  <Input id="legalName" name="legalName" placeholder="Monaco Trading SAM" required className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="regNumber" className="text-[12px]">N° registre</Label>
-                  <Input id="regNumber" placeholder="RC 2024B..." className="h-9 font-data text-[13px]" />
+                  <Input id="regNumber" name="regNumber" placeholder="RC 2024B..." className="h-7 font-data text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="jurisdiction" className="text-[12px]">Juridiction</Label>
-                  <Input id="jurisdiction" placeholder="MC" className="h-7 text-[11px]" />
+                  <Input id="jurisdiction" name="jurisdiction" placeholder="MC" className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="companyType" className="text-[12px]">Forme</Label>
-                  <Input id="companyType" placeholder="SAM, SARL, SCI..." className="h-7 text-[11px]" />
+                  <Input id="companyType" name="companyType" placeholder="sam" className="h-7 text-[11px]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="industry" className="text-[12px]">Secteur</Label>
-                  <Input id="industry" placeholder="Finance, Immobilier..." className="h-7 text-[11px]" />
+                  <Input id="industry" name="industry" placeholder="Finance, Immobilier..." className="h-7 text-[11px]" />
                 </div>
               </div>
             )}
