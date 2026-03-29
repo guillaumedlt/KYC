@@ -110,3 +110,11 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* Print styles */
+@media print {
+  body { background: white !important; font-size: 11px !important; }
+  aside, header, [data-print-hide] { display: none !important; }
+  main { padding: 0 !important; overflow: visible !important; }
+  #report { border: none !important; padding: 0 !important; }
+}
