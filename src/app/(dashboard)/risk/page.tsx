@@ -12,7 +12,7 @@ export default async function RiskPage() {
     .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b.risk_score as number) - (a.risk_score as number));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="w-full space-y-5">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {(["critical", "high", "medium", "low"] as const).map((lvl) => {
           const n = entities.filter((e: Record<string, unknown>) => e.risk_level === lvl).length;

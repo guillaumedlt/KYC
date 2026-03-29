@@ -17,7 +17,7 @@ export default async function DocumentsPage() {
   const verified = docs.filter((d: Record<string, unknown>) => d.status === "verified").length;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="w-full space-y-5">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCard label="Total" value={docs.length} />
         <StatCard label="Vérifiés" value={verified} color="text-emerald-600" />

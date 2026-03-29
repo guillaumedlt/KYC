@@ -9,7 +9,7 @@ export default async function ReportsPage() {
   const completedCases = cases.filter((c: Record<string, unknown>) => ["approved", "rejected", "escalated"].includes(c.status as string));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="w-full space-y-5">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
         <div className="rounded-md border border-border bg-card px-4 py-3">
           <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Rapports disponibles</p>
