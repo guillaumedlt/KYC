@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { KycStatusBadge, RiskBadge } from "@/components/features/status-badge";
 import { CreateEntityDialog } from "@/components/features/create-entity-dialog";
-import { User, Building2, Landmark, Star } from "lucide-react";
+import { User, Building2, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RiskLevel } from "@/types";
 
@@ -54,8 +54,6 @@ export function EntitiesClient({ entities }: { entities: any[] }) {
       <div className="overflow-x-auto rounded border border-border">
         <table className="w-full min-w-[640px]">
           <thead><tr className="border-b border-border bg-muted/50">
-            <th className="w-8 px-2 py-1.5" />
-            <th className="w-7 px-1 py-1.5" />
             <th className="px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Nom</th>
             <th className="w-20 px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Type</th>
             <th className="w-16 px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Pays</th>
@@ -69,8 +67,6 @@ export function EntitiesClient({ entities }: { entities: any[] }) {
               const nat = getNat(entity);
               return (
                 <tr key={entity.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
-                  <td className="px-2 py-0"><input type="checkbox" className="h-3 w-3 rounded border-border" /></td>
-                  <td className="px-1 py-0"><Star className="h-3 w-3 text-muted-foreground/30 hover:text-amber-400" strokeWidth={1.5} /></td>
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-2">
                       <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />

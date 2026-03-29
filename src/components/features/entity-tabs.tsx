@@ -117,18 +117,29 @@ export function EntityTabs(props: Props) {
 
 function InfoTab({ entityId, person, company, riskFactors }: Props) {
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   async function handleSave() {
     if (!formRef.current) return;
+    setSaving(true);
     const formData = new FormData(formRef.current);
     if (person) await updatePerson(entityId, formData);
     if (company) await updateCompany(entityId, formData);
+    setSaving(false);
     setEditing(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   }
 
   return (
     <div className="space-y-8">
+      {saved && (
+        <div className="rounded bg-emerald-50 px-3 py-1.5 text-[10px] font-medium text-emerald-700">
+          Modifications enregistrées
+        </div>
+      )}
       <form ref={formRef}>
       {/* Person info */}
       {person && (
@@ -140,6 +151,7 @@ function InfoTab({ entityId, person, company, riskFactors }: Props) {
             </span>
             <button
               type="button"
+              disabled={saving}
               onClick={() => editing ? handleSave() : setEditing(true)}
               className={cn(
                 "flex items-center gap-1 rounded px-2 py-0.5 text-[10px] transition-colors",
@@ -184,6 +196,7 @@ function InfoTab({ entityId, person, company, riskFactors }: Props) {
             </span>
             <button
               type="button"
+              disabled={saving}
               onClick={() => editing ? handleSave() : setEditing(true)}
               className={cn(
                 "flex items-center gap-1 rounded px-2 py-0.5 text-[10px] transition-colors",
@@ -301,7 +314,7 @@ function EditableField({
 // =============================================================================
 
 function RelationsTab({ relations, entityId, allEntities }: Props) {
-  if (relations.length === 0) return <Empty text="Aucune relation" />;
+  if (relations.length === 0) return <Empty text="Aucune relation" sub="Ajoutez un UBO, actionnaire ou dirigeant via le bouton Lien" />;
   return (
     <div className="space-y-2">
       {relations.map((rel) => {
@@ -345,7 +358,7 @@ function RelationsTab({ relations, entityId, allEntities }: Props) {
 // =============================================================================
 
 function ScreeningTab({ screenings }: { screenings: Screening[] }) {
-  if (screenings.length === 0) return <Empty text="Aucun screening effectué" />;
+  if (screenings.length === 0) return <Empty text="Aucun screening effectué" sub="Lancez un screening PEP/sanctions via le bouton Screen" />;
   return (
     <div className="space-y-2">
       {screenings.map((s) => {
@@ -413,7 +426,7 @@ function ScreeningTab({ screenings }: { screenings: Screening[] }) {
 // =============================================================================
 
 function CasesTab({ cases }: { cases: KycCase[] }) {
-  if (cases.length === 0) return <Empty text="Aucun dossier KYC" />;
+  if (cases.length === 0) return <Empty text="Aucun dossier KYC" sub="Ouvrez un dossier de vérification via le bouton KYC" />;
   return (
     <div className="space-y-2">
       {cases.map((c) => (
@@ -462,10 +475,11 @@ function TimelineTab({ activities }: { activities: Activity[] }) {
   );
 }
 
-function Empty({ text }: { text: string }) {
+function Empty({ text, sub }: { text: string; sub?: string }) {
   return (
-    <div className="flex items-center justify-center rounded-lg bg-secondary/30 py-12">
-      <p className="text-[13px] text-muted-foreground">{text}</p>
+    <div className="flex flex-col items-center justify-center rounded bg-muted/30 py-10">
+      <p className="text-[11px] text-muted-foreground">{text}</p>
+      {sub && <p className="mt-0.5 text-[10px] text-muted-foreground/60">{sub}</p>}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import { getScreenings } from "@/lib/supabase/queries";
+import { ScreeningReviewButtons } from "./review-buttons";
 import { cn } from "@/lib/utils";
 
 const TYPE_L: Record<string, string> = { pep: "PEP", sanctions: "Sanctions", adverse_media: "Adverse media" };
@@ -34,10 +35,7 @@ export default async function ScreeningPage() {
                   <span className="text-[10px] text-muted-foreground">{TYPE_L[s.screening_type as string]}</span>
                   {match && <span className="text-[10px] text-red-700">{String((match as Record<string, unknown>).name ?? (match as Record<string, unknown>).title ?? "")}</span>}
                 </div>
-                <div className="flex gap-1">
-                  <button className="rounded bg-white px-2 py-0.5 text-[10px] text-red-700 hover:bg-red-100">Faux positif</button>
-                  <button className="rounded bg-red-600 px-2 py-0.5 text-[10px] text-white hover:bg-red-700">Confirmer</button>
-                </div>
+                <ScreeningReviewButtons screeningId={s.id as string} />
               </div>
             );
           })}
