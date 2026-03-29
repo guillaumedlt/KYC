@@ -17,7 +17,7 @@ export default async function DashboardPage() {
     .sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(a.due_date as string).getTime() - new Date(b.due_date as string).getTime());
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       {/* Stats */}
       <div className="mb-6 grid grid-cols-2 gap-6 sm:grid-cols-4">
         <StatCard label="Entités" value={entities.length} />
