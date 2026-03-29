@@ -15,7 +15,7 @@ export default async function DashboardLayout({
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header userName={user.full_name} userRole={user.role} />
-        <main className="flex-1 overflow-y-auto px-3 py-3 sm:px-4">{children}</main>
+        <main className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">{children}</main>
       </div>
       <CommandPalette />
     </div>

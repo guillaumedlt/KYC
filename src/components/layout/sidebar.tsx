@@ -5,24 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  Users,
-  FolderOpen,
-  Search,
-  Zap,
-  FileText,
-  ClipboardList,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  X,
+  LayoutDashboard, Users, FolderOpen, Search, Zap,
+  FileText, ClipboardList, Settings, ChevronLeft, ChevronRight, Menu, X,
 } from "lucide-react";
 
 const NAV = [
-  { section: null, items: [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  ]},
+  { section: null, items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
   { section: "CRM", items: [
     { href: "/entities", label: "Entités", icon: Users },
     { href: "/cases", label: "Dossiers", icon: FolderOpen },
@@ -42,64 +30,54 @@ export function Sidebar() {
 
   return (
     <>
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed left-2 top-2 z-40 flex h-7 w-7 items-center justify-center rounded bg-secondary text-muted-foreground lg:hidden"
-      >
-        <Menu className="h-3.5 w-3.5" />
+      <button onClick={() => setMobileOpen(true)} className="fixed left-3 top-3 z-40 flex h-8 w-8 items-center justify-center rounded-md bg-card text-muted-foreground shadow-sm lg:hidden">
+        <Menu className="h-4 w-4" />
       </button>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-foreground/10" onClick={() => setMobileOpen(false)} />
-      )}
+      {mobileOpen && <div className="fixed inset-0 z-40 bg-foreground/5 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />}
 
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-150 lg:relative lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200 lg:relative lg:translate-x-0",
         mobileOpen ? "translate-x-0" : "-translate-x-full",
-        collapsed ? "lg:w-10" : "lg:w-[180px]",
-        "w-[200px]",
+        collapsed ? "lg:w-[52px]" : "lg:w-[200px]",
+        "w-[220px]",
       )}>
         {/* Logo */}
-        <div className="flex h-10 items-center justify-between border-b border-sidebar-border px-2.5">
-          <div className="flex items-center gap-2">
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-foreground">
-              <span className="font-mono text-[9px] font-bold leading-none text-background">K</span>
-            </div>
+        <div className="flex h-12 items-center justify-between border-b border-sidebar-border px-4">
+          <div className="flex items-center gap-2.5">
+            <span className="font-heading text-[16px] text-foreground">K</span>
             {!collapsed && (
-              <span className="text-[11px] font-semibold text-foreground">KYC Monaco</span>
+              <div className="flex flex-col">
+                <span className="text-[12px] font-medium text-foreground">KYC Monaco</span>
+                <span className="text-[9px] tracking-wider text-muted-foreground">CONFORMITÉ AMSF</span>
+              </div>
             )}
           </div>
-          <button onClick={() => setMobileOpen(false)} className="text-muted-foreground lg:hidden">
-            <X className="h-3.5 w-3.5" />
-          </button>
+          <button onClick={() => setMobileOpen(false)} className="text-muted-foreground lg:hidden"><X className="h-4 w-4" /></button>
         </div>
 
         {/* Nav */}
-        <nav className="flex flex-1 flex-col gap-3 overflow-y-auto px-1.5 py-2">
+        <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-2.5 pt-4">
           {NAV.map((group, gi) => (
             <div key={gi}>
               {group.section && !collapsed && (
-                <span className="mb-1 block px-1.5 text-[9px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                <span className="mb-1.5 block px-2 text-[9px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
                   {group.section}
                 </span>
               )}
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-0.5">
                 {group.items.map((item) => {
                   const active = pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileOpen(false)}
+                    <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
                       title={collapsed ? item.label : undefined}
                       className={cn(
-                        "flex h-7 items-center gap-2 rounded px-1.5 text-[11px] transition-colors",
+                        "flex h-8 items-center gap-2.5 rounded-md px-2 text-[11px] transition-all duration-150",
                         active
-                          ? "bg-sidebar-accent font-medium text-foreground"
+                          ? "bg-foreground text-background"
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-                      )}
-                    >
-                      <item.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={active ? 2 : 1.5} />
+                      )}>
+                      <item.icon className="h-[14px] w-[14px] shrink-0" strokeWidth={active ? 2 : 1.5} />
                       {!collapsed && <span>{item.label}</span>}
                     </Link>
                   );
@@ -110,25 +88,17 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom */}
-        <div className="border-t border-sidebar-border px-1.5 py-1.5">
-          <Link
-            href="/settings"
-            onClick={() => setMobileOpen(false)}
-            className={cn(
-              "flex h-7 items-center gap-2 rounded px-1.5 text-[11px] transition-colors",
-              pathname.startsWith("/settings")
-                ? "bg-sidebar-accent font-medium text-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-            )}
-          >
-            <Settings className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+        <div className="border-t border-sidebar-border px-2.5 py-2">
+          <Link href="/settings" onClick={() => setMobileOpen(false)}
+            className={cn("flex h-8 items-center gap-2.5 rounded-md px-2 text-[11px] transition-all duration-150",
+              pathname.startsWith("/settings") ? "bg-foreground text-background" : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+            )}>
+            <Settings className="h-[14px] w-[14px] shrink-0" strokeWidth={1.5} />
             {!collapsed && <span>Paramètres</span>}
           </Link>
-          <button
-            onClick={() => setCollapsed((p) => !p)}
-            className="hidden h-7 w-full items-center gap-2 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground lg:flex"
-          >
-            {collapsed ? <ChevronRight className="h-3 w-3" /> : <><ChevronLeft className="h-3 w-3" /><span>Réduire</span></>}
+          <button onClick={() => setCollapsed((p) => !p)}
+            className="hidden h-8 w-full items-center gap-2.5 rounded-md px-2 text-[11px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground lg:flex">
+            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <><ChevronLeft className="h-3.5 w-3.5" /><span>Réduire</span></>}
           </button>
         </div>
       </aside>
