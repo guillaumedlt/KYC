@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Upload, Sparkles, CheckCircle, AlertTriangle, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { aiExtractAddress } from "@/app/actions/ai-extract";
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
@@ -24,21 +25,31 @@ export function PersonAddressStep({ data, update, next, back }: {
     update({ addressFile: file });
     setAnalyzing(true);
     setExtracted(false);
-    setTimeout(() => {
-      // TODO: Claude API Vision extraction
-      update({
-        addressExtracted: "27 Boulevard Albert 1er, 98000 Monaco",
-        aiExtractions: {
-          ...data.aiExtractions,
-          address_confidence: "92",
-          address_date: "15/02/2026",
-          address_type: "Attestation de résidence",
-          address_valid: "true",
-        },
-      });
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(",")[1];
+      const result = await aiExtractAddress(base64);
+
+      if (result && result.confidence > 0) {
+        update({
+          addressExtracted: result.address ?? "",
+          aiExtractions: {
+            ...data.aiExtractions,
+            address_confidence: String(result.confidence),
+            address_date: result.documentDate ?? "",
+            address_type: result.documentType ?? "",
+            address_valid: result.isRecent ? "true" : "false",
+          },
+        });
+      } else {
+        update({ addressExtracted: "", aiExtractions: { ...data.aiExtractions, address_confidence: "0" } });
+        setEditMode(true);
+      }
       setAnalyzing(false);
       setExtracted(true);
-    }, 1800);
+    };
+    reader.readAsDataURL(file);
   }
 
   return (

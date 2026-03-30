@@ -5,6 +5,7 @@ import { Upload, Sparkles, CheckCircle, AlertTriangle, Camera, Loader2, Pencil }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { aiExtractIdentity } from "@/app/actions/ai-extract";
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
@@ -32,33 +33,46 @@ export function PersonIdentityStep({
     if (!file) return;
     update({ documentFile: file });
 
-    // AI extracts EVERYTHING — nationality, residence, name, DOB, doc number, expiry
+    // AI extracts EVERYTHING via Claude Vision
     setAnalyzing(true);
     setExtracted(false);
-    setTimeout(() => {
-      // TODO: Replace with Claude API Vision call on the document
-      update({
-        nationality: "MC",
-        residence: "MC",
-        firstName: "Jean-Pierre",
-        lastName: "Moretti",
-        dateOfBirth: "15/03/1965",
-        documentType: "passport",
-        documentNumber: "MC1234567",
-        documentExpiry: "12/2030",
-        aiExtractions: {
-          ...data.aiExtractions,
-          identity_confidence: "96",
-          mrz_valid: "true",
-          doc_type_detected: "passport",
-          nationality_detected: "MC",
-          residence_detected: "MC",
-        },
-        aiWarnings: [],
-      });
+
+    // Convert file to base64 for Claude Vision
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(",")[1];
+      const result = await aiExtractIdentity(base64);
+
+      if (result && result.confidence > 0) {
+        update({
+          nationality: result.nationality ?? "",
+          residence: result.countryOfResidence ?? result.nationality ?? "",
+          firstName: result.firstName ?? "",
+          lastName: result.lastName ?? "",
+          dateOfBirth: result.dateOfBirth ?? "",
+          documentType: result.documentType ?? "passport",
+          documentNumber: result.documentNumber ?? "",
+          documentExpiry: result.documentExpiry ?? "",
+          aiExtractions: {
+            ...data.aiExtractions,
+            identity_confidence: String(result.confidence),
+            mrz_valid: "true",
+            doc_type_detected: result.documentType ?? "unknown",
+            nationality_detected: result.nationality ?? "",
+            residence_detected: result.countryOfResidence ?? "",
+          },
+          aiWarnings: result.warnings ?? [],
+        });
+        setExtracted(true);
+      } else {
+        // Fallback if AI fails
+        update({ aiWarnings: ["L'extraction IA a échoué. Veuillez remplir manuellement."] });
+        setEditMode(true);
+        setExtracted(true);
+      }
       setAnalyzing(false);
-      setExtracted(true);
-    }, 2500);
+    };
+    reader.readAsDataURL(file);
   }
 
   const canProceed = extracted && data.firstName && data.lastName;

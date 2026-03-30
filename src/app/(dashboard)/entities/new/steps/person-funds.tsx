@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Upload, CheckCircle, Loader2, Sparkles, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { aiExtractFunds } from "@/app/actions/ai-extract";
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
@@ -29,22 +30,31 @@ export function PersonFundsStep({ data, update, next, back }: {
     update({ fundsFile: file });
     setAnalyzing(true);
     setExtracted(false);
-    setTimeout(() => {
-      // TODO: Claude API — detect fund source type + extract amounts
-      update({
-        fundsSource: "salary",
-        fundsAmount: "8 500 € / mois",
-        aiExtractions: {
-          ...data.aiExtractions,
-          funds_confidence: "89",
-          funds_type_detected: "salary",
-          funds_employer: "Conseil National de Monaco",
-          funds_period: "Janvier 2026",
-        },
-      });
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(",")[1];
+      const result = await aiExtractFunds(base64);
+
+      if (result && result.confidence > 0) {
+        update({
+          fundsSource: result.sourceType ?? "other",
+          fundsAmount: result.amount ?? "",
+          aiExtractions: {
+            ...data.aiExtractions,
+            funds_confidence: String(result.confidence),
+            funds_type_detected: result.sourceType ?? "",
+            funds_employer: result.employer ?? "",
+            funds_period: result.period ?? "",
+          },
+        });
+      } else {
+        setEditMode(true);
+      }
       setAnalyzing(false);
       setExtracted(true);
-    }, 2000);
+    };
+    reader.readAsDataURL(file);
   }
 
   return (
