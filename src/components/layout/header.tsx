@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Search, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { cn } from "@/lib/utils";
 
 const PAGE_TITLES: Record<string, string> = {
@@ -24,7 +25,7 @@ function triggerCmdK() {
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
 }
 
-export function Header({ userName, userRole }: { userName: string; userRole: string }) {
+export function Header({ userName, userRole, locale = "fr" }: { userName: string; userRole: string; locale?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const base = "/" + (pathname.split("/")[1] ?? "");
@@ -57,6 +58,7 @@ export function Header({ userName, userRole }: { userName: string; userRole: str
             <p className="text-[9px] leading-none text-muted-foreground">{ROLE_LABELS[userRole] ?? userRole}</p>
           </div>
         </div>
+        <LocaleSwitcher current={locale} />
         <button onClick={handleLogout} title="Déconnexion"
           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
           <LogOut className="h-3.5 w-3.5" />
