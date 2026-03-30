@@ -13,6 +13,13 @@ export default async function RiskPage() {
 
   return (
     <div className="w-full space-y-5">
+      {/* Link to matrices */}
+      <div className="flex items-center justify-end">
+        <Link href="/risk/matrices" className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground">
+          <span>⚙️</span> Matrices de risque
+        </Link>
+      </div>
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {(["critical", "high", "medium", "low"] as const).map((lvl) => {
           const n = entities.filter((e: Record<string, unknown>) => e.risk_level === lvl).length;
