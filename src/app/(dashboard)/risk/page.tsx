@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertTriangle, Settings } from "lucide-react";
 import { getEntities } from "@/lib/supabase/queries";
 import { getRiskFactors } from "@/lib/mock-data";
 import { RiskBadge } from "@/components/features/status-badge";
@@ -11,12 +12,36 @@ export default async function RiskPage() {
     .filter((e: Record<string, unknown>) => e.risk_score != null)
     .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b.risk_score as number) - (a.risk_score as number));
 
+  const notScored = entities.filter((e: Record<string, unknown>) => e.risk_score == null);
+  const criticalOrHigh = entities.filter((e: Record<string, unknown>) => e.risk_level === "critical" || e.risk_level === "high");
+  const needsReview = entities.filter((e: Record<string, unknown>) => {
+    if (!e.next_review_at) return false;
+    return new Date(e.next_review_at as string).getTime() < Date.now();
+  });
+
   return (
     <div className="w-full space-y-5">
-      {/* Link to matrices */}
-      <div className="flex items-center justify-end">
+      {/* Contextual hints */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          {criticalOrHigh.length > 0 && (
+            <span className="flex items-center gap-1 rounded-md bg-orange-50 px-2.5 py-1 text-[11px] text-orange-700">
+              <AlertTriangle className="h-3 w-3" /> <strong className="font-data">{criticalOrHigh.length}</strong> entité{criticalOrHigh.length > 1 ? "s" : ""} à risque élevé/critique
+            </span>
+          )}
+          {notScored.length > 0 && (
+            <span className="flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-[11px] text-amber-700">
+              <strong className="font-data">{notScored.length}</strong> non évalué{notScored.length > 1 ? "es" : "e"}
+            </span>
+          )}
+          {needsReview.length > 0 && (
+            <span className="flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-[11px] text-red-700">
+              <strong className="font-data">{needsReview.length}</strong> revue{needsReview.length > 1 ? "s" : ""} en retard
+            </span>
+          )}
+        </div>
         <Link href="/risk/matrices" className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground">
-          <span>⚙️</span> Matrices de risque
+          <Settings className="h-3 w-3" /> Matrices
         </Link>
       </div>
 

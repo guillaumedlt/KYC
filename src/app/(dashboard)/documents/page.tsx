@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Upload, CheckCircle, Clock, Sparkles, FileText, AlertCircle } from "lucide-react";
+import { Upload, CheckCircle, Clock, Sparkles, FileText, AlertCircle, AlertTriangle } from "lucide-react";
 import { getDocuments } from "@/lib/supabase/queries";
 import { cn } from "@/lib/utils";
 
@@ -15,9 +15,27 @@ const ST: Record<string, { label: string; icon: typeof CheckCircle; cls: string 
 export default async function DocumentsPage() {
   const docs = await getDocuments();
   const verified = docs.filter((d: Record<string, unknown>) => d.status === "verified").length;
+  const needsReview = docs.filter((d: Record<string, unknown>) => d.status === "extracted").length;
+  const processing = docs.filter((d: Record<string, unknown>) => d.status === "processing").length;
 
   return (
     <div className="w-full space-y-5">
+      {/* Contextual hints */}
+      {(needsReview > 0 || processing > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {needsReview > 0 && (
+            <span className="flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-[11px] text-amber-700">
+              <AlertTriangle className="h-3 w-3" /> <strong className="font-data">{needsReview}</strong> document{needsReview > 1 ? "s" : ""} extrait{needsReview > 1 ? "s" : ""} à vérifier
+            </span>
+          )}
+          {processing > 0 && (
+            <span className="flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-[11px] text-blue-700">
+              <Sparkles className="h-3 w-3" /> <strong className="font-data">{processing}</strong> extraction{processing > 1 ? "s" : ""} IA en cours
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCard label="Total" value={docs.length} />
         <StatCard label="Vérifiés" value={verified} color="text-emerald-600" />
@@ -71,8 +89,10 @@ export default async function DocumentsPage() {
           </table>
         </div>
       ) : (
-        <div className="rounded-md border border-border bg-card py-12 text-center">
+        <div className="rounded-md border border-dashed border-border bg-card px-6 py-10 text-center">
+          <Upload className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
           <p className="text-[12px] text-muted-foreground">Aucun document</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground/60">Commencez par créer un client via &quot;Nouveau client&quot;</p>
         </div>
       )}
     </div>
