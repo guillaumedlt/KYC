@@ -24,12 +24,12 @@ type TaskType =
 
 const MODEL_MAP: Record<TaskType, string> = {
   classify: "claude-haiku-4-5-20251001",
-  extract: "claude-sonnet-4-6-20250131",
+  extract: "claude-sonnet-4-20250514",
   screen: "claude-haiku-4-5-20251001",
-  risk_assess: "claude-sonnet-4-6-20250131",
+  risk_assess: "claude-sonnet-4-20250514",
   summarize: "claude-haiku-4-5-20251001",
-  report: "claude-sonnet-4-6-20250131",
-  complex_analysis: "claude-opus-4-6-20250131",
+  report: "claude-sonnet-4-20250514",
+  complex_analysis: "claude-opus-4-20250514",
 };
 
 const MAX_TOKENS_MAP: Record<TaskType, number> = {
@@ -69,10 +69,13 @@ export async function callClaude(
     messages: [{ role: "user", content }],
   });
 
-  const text = response.content
+  const rawText = response.content
     .filter((c): c is Anthropic.TextBlock => c.type === "text")
     .map((c) => c.text)
     .join("");
+
+  // Extract JSON from response (Claude sometimes wraps in ```json ... ```)
+  const text = extractJson(rawText);
 
   return {
     text,
@@ -80,6 +83,17 @@ export async function callClaude(
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
   };
+}
+
+/** Extract JSON from a Claude response that may contain markdown code blocks */
+function extractJson(text: string): string {
+  // Try to find JSON in code block
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) return codeBlockMatch[1].trim();
+  // Try to find raw JSON object
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) return jsonMatch[0];
+  return text;
 }
 
 // =============================================================================
