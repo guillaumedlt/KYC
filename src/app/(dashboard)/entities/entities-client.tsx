@@ -4,9 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { createColumnHelper } from "@tanstack/react-table";
 import { KycStatusBadge, RiskBadge } from "@/components/features/status-badge";
-import { CreateEntityDialog } from "@/components/features/create-entity-dialog";
 import { DataTable } from "@/components/features/data-table";
-import { User, Building2, Landmark } from "lucide-react";
+import { User, Building2, Landmark, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RiskLevel, KycStatus } from "@/types";
 
@@ -121,7 +120,9 @@ export function EntitiesClient({ entities }: { entities: any[] }) {
             </button>
           ))}
         </div>
-        <CreateEntityDialog />
+        <Link href="/entities/new" className="flex h-7 items-center gap-1.5 rounded-md bg-foreground px-3 text-[11px] font-medium text-background transition-colors hover:bg-foreground/90">
+          <Plus className="h-3 w-3" /> Nouvelle vérification
+        </Link>
       </div>
 
       <DataTable columns={columns} data={filtered} searchPlaceholder="Filtrer les entités..." />
