@@ -1,19 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, Sparkles, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { Upload, Sparkles, CheckCircle, AlertTriangle, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
-const EXAMPLES: Record<string, string> = {
-  MC: "Attestation de résidence de la Mairie",
-  FR: "Facture EDF/GDF, avis d'imposition, quittance de loyer",
-  GB: "Utility bill (gas, electricity, water), council tax",
-  US: "Utility bill, bank statement, government letter",
-  AE: "Attestation de résidence (Emirates ID)",
+const FLAGS: Record<string, string> = {
+  MC: "🇲🇨 Monaco", FR: "🇫🇷 France", IT: "🇮🇹 Italie", GB: "🇬🇧 Royaume-Uni", US: "🇺🇸 États-Unis",
 };
 
 export function PersonAddressStep({ data, update, next, back }: {
@@ -21,6 +15,7 @@ export function PersonAddressStep({ data, update, next, back }: {
 }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [extracted, setExtracted] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -28,11 +23,22 @@ export function PersonAddressStep({ data, update, next, back }: {
     if (!file) return;
     update({ addressFile: file });
     setAnalyzing(true);
+    setExtracted(false);
     setTimeout(() => {
-      update({ addressExtracted: "27 Boulevard Albert 1er, 98000 Monaco" });
+      // TODO: Claude API Vision extraction
+      update({
+        addressExtracted: "27 Boulevard Albert 1er, 98000 Monaco",
+        aiExtractions: {
+          ...data.aiExtractions,
+          address_confidence: "92",
+          address_date: "15/02/2026",
+          address_type: "Attestation de résidence",
+          address_valid: "true",
+        },
+      });
       setAnalyzing(false);
       setExtracted(true);
-    }, 1500);
+    }, 1800);
   }
 
   return (
@@ -40,14 +46,14 @@ export function PersonAddressStep({ data, update, next, back }: {
       <div>
         <h2 className="mb-1 font-heading text-[18px] text-foreground">Preuve d&apos;adresse</h2>
         <p className="text-[12px] text-muted-foreground">
-          Justificatif de domicile de moins de 3 mois. L&apos;IA vérifie la date et extrait l&apos;adresse.
+          Uploadez le justificatif. L&apos;IA détecte le type de document, extrait l&apos;adresse et vérifie la date.
         </p>
       </div>
 
-      {/* Country-specific hint */}
-      {data.residence && EXAMPLES[data.residence] && (
-        <div className="rounded-md bg-blue-50/80 px-4 py-2.5 text-[11px] text-blue-700">
-          <strong>Documents acceptés pour {data.residence} :</strong> {EXAMPLES[data.residence]}
+      {/* Context from previous step */}
+      {data.residence && (
+        <div className="rounded-md bg-muted/30 px-4 py-2 text-[11px] text-muted-foreground">
+          Résidence détectée : <strong className="text-foreground">{FLAGS[data.residence] ?? data.residence}</strong> — les documents acceptés seront adaptés.
         </div>
       )}
 
@@ -55,40 +61,97 @@ export function PersonAddressStep({ data, update, next, back }: {
       <div
         onClick={() => fileRef.current?.click()}
         className={cn(
-          "flex cursor-pointer flex-col items-center gap-3 rounded-md border-2 border-dashed px-6 py-6 transition-colors",
-          data.addressFile ? "border-emerald-300 bg-emerald-50/50" : "border-border hover:border-foreground/20",
+          "flex cursor-pointer flex-col items-center gap-4 rounded-md border-2 border-dashed px-6 py-8 transition-all",
+          analyzing ? "border-foreground/30 bg-muted/20" :
+          data.addressFile ? "border-emerald-300 bg-emerald-50/50" :
+          "border-border hover:border-foreground/20 hover:bg-muted/10",
         )}
       >
         {analyzing ? (
-          <><Loader2 className="h-6 w-6 animate-spin text-foreground" /><p className="text-[12px] font-medium">Extraction de l&apos;adresse...</p></>
+          <>
+            <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+            <div className="text-center">
+              <p className="text-[13px] font-medium">Analyse du justificatif...</p>
+              <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+                <p>Détection du type de document...</p>
+                <p>Extraction de l&apos;adresse...</p>
+                <p>Vérification de la date (&lt; 3 mois)...</p>
+              </div>
+            </div>
+          </>
         ) : data.addressFile ? (
-          <><CheckCircle className="h-6 w-6 text-emerald-600" /><p className="text-[12px] font-medium">{data.addressFile.name}</p></>
+          <>
+            <CheckCircle className="h-8 w-8 text-emerald-600" />
+            <div className="text-center">
+              <p className="text-[13px] font-medium">{data.addressFile.name}</p>
+              <p className="mt-0.5 text-[11px] text-emerald-600">Analysé · Cliquez pour remplacer</p>
+            </div>
+          </>
         ) : (
-          <><Upload className="h-6 w-6 text-muted-foreground" /><p className="text-[12px] font-medium">Glissez ou cliquez</p><p className="text-[11px] text-muted-foreground">PDF, JPG, PNG — moins de 3 mois</p></>
+          <>
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <div className="text-center">
+              <p className="text-[13px] font-medium">Déposez le justificatif de domicile</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Facture, attestation, relevé — moins de 3 mois</p>
+            </div>
+          </>
         )}
         <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleUpload} className="hidden" />
       </div>
 
-      {/* Extracted address */}
+      {/* Extracted data */}
       {extracted && (
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Adresse extraite</span>
+        <div className="rounded-md border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Extraction IA</span>
+              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-data text-[10px] font-medium text-emerald-600">
+                {data.aiExtractions.address_confidence}%
+              </span>
+            </div>
+            <button onClick={() => setEditMode(!editMode)}
+              className={cn("flex items-center gap-1 rounded-md px-2 py-1 text-[10px] transition-colors",
+                editMode ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+              <Pencil className="h-3 w-3" />{editMode ? "Valider" : "Corriger"}
+            </button>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-[11px]">Adresse</Label>
-            <Input value={data.addressExtracted} onChange={(e) => update({ addressExtracted: e.target.value })} className="h-8 text-[12px]" />
+          <div className="divide-y divide-border/50">
+            <div className="flex items-center justify-between px-4 py-2">
+              <span className="w-40 text-[11px] text-muted-foreground">Type de document</span>
+              <span className="text-[12px] text-foreground">{data.aiExtractions.address_type}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2">
+              <span className="w-40 text-[11px] text-muted-foreground">Adresse</span>
+              {editMode ? (
+                <input value={data.addressExtracted} onChange={(e) => update({ addressExtracted: e.target.value })}
+                  className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-right text-[12px] focus:border-foreground/30 focus:outline-none" />
+              ) : (
+                <span className="text-[12px] text-foreground">{data.addressExtracted}</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between px-4 py-2">
+              <span className="w-40 text-[11px] text-muted-foreground">Date du document</span>
+              <span className="font-data text-[12px] text-foreground">{data.aiExtractions.address_date}</span>
+            </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-600">
-            <CheckCircle className="h-3 w-3" /> Document daté de moins de 3 mois · Adresse lisible
+          <div className="border-t border-border px-4 py-2">
+            {data.aiExtractions.address_valid === "true" ? (
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+                <CheckCircle className="h-3 w-3" /> Document daté de moins de 3 mois · Adresse lisible
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
+                <AlertTriangle className="h-3 w-3" /> Document de plus de 3 mois — un justificatif récent est requis
+              </div>
+            )}
           </div>
         </div>
       )}
 
       <div className="flex justify-between pt-2">
         <Button variant="ghost" size="sm" onClick={back} className="h-8 text-[11px]">Retour</Button>
-        <Button size="sm" onClick={next} disabled={!data.addressFile} className="h-8 text-[11px]">Continuer</Button>
+        <Button size="sm" onClick={next} disabled={!extracted} className="h-8 text-[11px]">Continuer</Button>
       </div>
     </div>
   );

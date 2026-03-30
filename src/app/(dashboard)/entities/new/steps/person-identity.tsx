@@ -1,26 +1,18 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, Sparkles, CheckCircle, AlertTriangle, Camera, Loader2 } from "lucide-react";
+import { Upload, Sparkles, CheckCircle, AlertTriangle, Camera, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
-const COUNTRIES = [
-  { code: "MC", name: "Monaco" }, { code: "FR", name: "France" }, { code: "IT", name: "Italie" },
-  { code: "GB", name: "Royaume-Uni" }, { code: "US", name: "États-Unis" }, { code: "CH", name: "Suisse" },
-  { code: "DE", name: "Allemagne" }, { code: "ES", name: "Espagne" }, { code: "RU", name: "Russie" },
-  { code: "LB", name: "Liban" }, { code: "AE", name: "Émirats Arabes Unis" }, { code: "BR", name: "Brésil" },
-  { code: "CN", name: "Chine" }, { code: "SA", name: "Arabie Saoudite" }, { code: "LU", name: "Luxembourg" },
-];
-
-const DOC_TYPES = [
-  { value: "passport", label: "Passeport" },
-  { value: "national_id", label: "Carte d'identité" },
-  { value: "residence_permit", label: "Titre de séjour" },
-];
+const FLAGS: Record<string, string> = {
+  MC: "🇲🇨 Monaco", FR: "🇫🇷 France", IT: "🇮🇹 Italie", GB: "🇬🇧 Royaume-Uni",
+  US: "🇺🇸 États-Unis", CH: "🇨🇭 Suisse", DE: "🇩🇪 Allemagne", ES: "🇪🇸 Espagne",
+  RU: "🇷🇺 Russie", LB: "🇱🇧 Liban", AE: "🇦🇪 EAU", BR: "🇧🇷 Brésil",
+};
 
 export function PersonIdentityStep({
   data, update, next, back,
@@ -32,6 +24,7 @@ export function PersonIdentityStep({
 }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [extracted, setExtracted] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -39,150 +32,147 @@ export function PersonIdentityStep({
     if (!file) return;
     update({ documentFile: file });
 
-    // Simulate AI extraction
+    // AI extracts EVERYTHING — nationality, residence, name, DOB, doc number, expiry
     setAnalyzing(true);
+    setExtracted(false);
     setTimeout(() => {
-      // TODO: Replace with Claude API call
+      // TODO: Replace with Claude API Vision call on the document
       update({
+        nationality: "MC",
+        residence: "MC",
         firstName: "Jean-Pierre",
         lastName: "Moretti",
         dateOfBirth: "15/03/1965",
+        documentType: "passport",
         documentNumber: "MC1234567",
         documentExpiry: "12/2030",
         aiExtractions: {
           ...data.aiExtractions,
           identity_confidence: "96",
           mrz_valid: "true",
+          doc_type_detected: "passport",
+          nationality_detected: "MC",
+          residence_detected: "MC",
         },
+        aiWarnings: [],
       });
       setAnalyzing(false);
       setExtracted(true);
-    }, 2000);
+    }, 2500);
   }
 
-  const canProceed = data.nationality && data.residence && data.firstName && data.lastName && data.documentFile;
+  const canProceed = extracted && data.firstName && data.lastName;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="mb-1 font-heading text-[18px] text-foreground">Identité</h2>
         <p className="text-[12px] text-muted-foreground">
-          Sélectionnez la nationalité puis uploadez le document d&apos;identité. L&apos;IA extraira automatiquement les informations.
+          Uploadez le document d&apos;identité. L&apos;IA détecte et extrait automatiquement toutes les informations.
         </p>
       </div>
 
-      {/* Country selection */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-[11px]">Nationalité</Label>
-          <select value={data.nationality} onChange={(e) => update({ nationality: e.target.value })}
-            className="h-9 w-full rounded-md border border-border bg-card px-3 text-[12px] text-foreground focus:border-foreground/30 focus:outline-none">
-            <option value="">Sélectionner...</option>
-            {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-[11px]">Pays de résidence</Label>
-          <select value={data.residence} onChange={(e) => update({ residence: e.target.value })}
-            className="h-9 w-full rounded-md border border-border bg-card px-3 text-[12px] text-foreground focus:border-foreground/30 focus:outline-none">
-            <option value="">Sélectionner...</option>
-            {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-          </select>
-        </div>
+      {/* Document upload — THIS IS THE FIRST AND ONLY ACTION */}
+      <div
+        onClick={() => fileRef.current?.click()}
+        className={cn(
+          "flex cursor-pointer flex-col items-center gap-4 rounded-md border-2 border-dashed px-6 py-8 transition-all",
+          analyzing ? "border-foreground/30 bg-muted/20" :
+          data.documentFile ? "border-emerald-300 bg-emerald-50/50" :
+          "border-border hover:border-foreground/20 hover:bg-muted/10",
+        )}
+      >
+        {analyzing ? (
+          <>
+            <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+            <div className="text-center">
+              <p className="text-[13px] font-medium text-foreground">Analyse IA en cours...</p>
+              <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+                <p>OCR du document...</p>
+                <p>Détection nationalité et pays de résidence...</p>
+                <p>Extraction nom, prénom, date de naissance...</p>
+                <p>Vérification MRZ et validité...</p>
+                <p>Screening PEP préliminaire...</p>
+              </div>
+            </div>
+          </>
+        ) : data.documentFile ? (
+          <>
+            <CheckCircle className="h-8 w-8 text-emerald-600" />
+            <div className="text-center">
+              <p className="text-[13px] font-medium text-foreground">{data.documentFile.name}</p>
+              <p className="mt-0.5 text-[11px] text-emerald-600">Analysé avec succès · Cliquez pour remplacer</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <div className="text-center">
+              <p className="text-[13px] font-medium text-foreground">Déposez le document d&apos;identité</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Passeport, carte d&apos;identité ou titre de séjour</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground/60">PDF, JPG, PNG — max 20 Mo</p>
+            </div>
+          </>
+        )}
+        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} className="hidden" />
       </div>
 
-      {/* Document type */}
-      <div className="space-y-1.5">
-        <Label className="text-[11px]">Type de document</Label>
-        <div className="flex gap-2">
-          {DOC_TYPES.map((dt) => (
-            <button key={dt.value} onClick={() => update({ documentType: dt.value })}
-              className={cn("rounded-md border px-3 py-1.5 text-[11px] transition-all",
-                data.documentType === dt.value ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:border-foreground/20")}>
-              {dt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Document upload */}
-      <div className="space-y-2">
-        <Label className="text-[11px]">Document d&apos;identité</Label>
-        <div
-          onClick={() => fileRef.current?.click()}
-          className={cn(
-            "flex cursor-pointer flex-col items-center gap-3 rounded-md border-2 border-dashed px-6 py-6 transition-colors",
-            data.documentFile ? "border-emerald-300 bg-emerald-50/50" : "border-border hover:border-foreground/20 hover:bg-muted/20",
-          )}
-        >
-          {analyzing ? (
-            <>
-              <Loader2 className="h-6 w-6 animate-spin text-foreground" />
-              <div className="text-center">
-                <p className="text-[12px] font-medium text-foreground">Analyse IA en cours...</p>
-                <p className="text-[11px] text-muted-foreground">OCR · Extraction · Vérification MRZ</p>
-              </div>
-            </>
-          ) : data.documentFile ? (
-            <>
-              <CheckCircle className="h-6 w-6 text-emerald-600" />
-              <div className="text-center">
-                <p className="text-[12px] font-medium text-foreground">{data.documentFile.name}</p>
-                <p className="text-[11px] text-emerald-600">Document analysé · Cliquez pour remplacer</p>
-              </div>
-            </>
-          ) : (
-            <>
-              <Upload className="h-6 w-6 text-muted-foreground" />
-              <div className="text-center">
-                <p className="text-[12px] font-medium text-foreground">Glissez ou cliquez</p>
-                <p className="text-[11px] text-muted-foreground">PDF, JPG, PNG — max 20 Mo</p>
-              </div>
-            </>
-          )}
-          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} className="hidden" />
-        </div>
-      </div>
-
-      {/* AI extracted fields */}
+      {/* AI extracted results — all auto-filled, editable on demand */}
       {extracted && (
         <div className="rounded-md border border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-            <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Extraction IA</span>
-            <span className="font-data text-[10px] text-emerald-600">{data.aiExtractions.identity_confidence}% confiance</span>
+          {/* Header with confidence + edit toggle */}
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Extraction IA</span>
+              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-data text-[10px] font-medium text-emerald-600">
+                {data.aiExtractions.identity_confidence}% confiance
+              </span>
+            </div>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={cn("flex items-center gap-1 rounded-md px-2 py-1 text-[10px] transition-colors",
+                editMode ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+            >
+              <Pencil className="h-3 w-3" />
+              {editMode ? "Valider" : "Corriger"}
+            </button>
           </div>
-          <div className="grid grid-cols-2 gap-4 p-4">
-            <div className="space-y-1.5">
-              <Label className="text-[11px]">Prénom</Label>
-              <Input value={data.firstName} onChange={(e) => update({ firstName: e.target.value })} className="h-8 text-[12px]" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[11px]">Nom</Label>
-              <Input value={data.lastName} onChange={(e) => update({ lastName: e.target.value })} className="h-8 text-[12px]" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[11px]">Date de naissance</Label>
-              <Input value={data.dateOfBirth} onChange={(e) => update({ dateOfBirth: e.target.value })} className="h-8 font-data text-[12px]" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[11px]">N° document</Label>
-              <Input value={data.documentNumber} onChange={(e) => update({ documentNumber: e.target.value })} className="h-8 font-data text-[12px]" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[11px]">Expiration</Label>
-              <Input value={data.documentExpiry} onChange={(e) => update({ documentExpiry: e.target.value })} className="h-8 font-data text-[12px]" />
+
+          {/* Fields */}
+          <div className="divide-y divide-border/50">
+            <FieldRow label="Type de document" value={data.documentType === "passport" ? "Passeport" : data.documentType === "national_id" ? "Carte d'identité" : "Titre de séjour"} editing={false} />
+            <FieldRow label="Nationalité" value={FLAGS[data.nationality] ?? data.nationality} editing={editMode}
+              onEdit={(v) => update({ nationality: v })} editValue={data.nationality} />
+            <FieldRow label="Pays de résidence" value={FLAGS[data.residence] ?? data.residence} editing={editMode}
+              onEdit={(v) => update({ residence: v })} editValue={data.residence} />
+            <FieldRow label="Prénom" value={data.firstName} editing={editMode} onEdit={(v) => update({ firstName: v })} />
+            <FieldRow label="Nom" value={data.lastName} editing={editMode} onEdit={(v) => update({ lastName: v })} />
+            <FieldRow label="Date de naissance" value={data.dateOfBirth} mono editing={editMode} onEdit={(v) => update({ dateOfBirth: v })} />
+            <FieldRow label="N° document" value={data.documentNumber} mono editing={editMode} onEdit={(v) => update({ documentNumber: v })} />
+            <FieldRow label="Expiration" value={data.documentExpiry} mono editing={editMode} onEdit={(v) => update({ documentExpiry: v })} />
+          </div>
+
+          {/* Verifications */}
+          <div className="border-t border-border px-4 py-2">
+            <div className="space-y-1">
+              {data.aiExtractions.mrz_valid === "true" && (
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+                  <CheckCircle className="h-3 w-3" /> MRZ vérifié — cohérent avec les champs
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+                <CheckCircle className="h-3 w-3" /> Document non expiré (valid. {data.documentExpiry})
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+                <CheckCircle className="h-3 w-3" /> Nationalité et résidence détectées
+              </div>
             </div>
           </div>
-          {data.aiExtractions.mrz_valid === "true" && (
-            <div className="flex items-center gap-1.5 border-t border-border px-4 py-2 text-[11px] text-emerald-600">
-              <CheckCircle className="h-3 w-3" /> MRZ vérifié · Cohérent avec les champs extraits
-            </div>
-          )}
         </div>
       )}
 
-      {/* Selfie / Liveness */}
+      {/* Biometric verification */}
       {extracted && (
         <div className="rounded-md border border-dashed border-border bg-card px-5 py-4">
           <div className="flex items-center gap-3">
@@ -196,7 +186,7 @@ export function PersonIdentityStep({
         </div>
       )}
 
-      {/* AI warnings */}
+      {/* Warnings */}
       {data.aiWarnings.length > 0 && (
         <div className="space-y-1">
           {data.aiWarnings.map((w, i) => (
@@ -207,11 +197,37 @@ export function PersonIdentityStep({
         </div>
       )}
 
-      {/* Nav */}
+      {/* Navigation */}
       <div className="flex justify-between pt-2">
         <Button variant="ghost" size="sm" onClick={back} className="h-8 text-[11px]">Retour</Button>
         <Button size="sm" onClick={next} disabled={!canProceed} className="h-8 text-[11px]">Continuer</Button>
       </div>
+    </div>
+  );
+}
+
+function FieldRow({
+  label, value, mono, editing, onEdit, editValue,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  editing: boolean;
+  onEdit?: (v: string) => void;
+  editValue?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between px-4 py-2">
+      <span className="w-40 shrink-0 text-[11px] text-muted-foreground">{label}</span>
+      {editing && onEdit ? (
+        <input
+          value={editValue ?? value}
+          onChange={(e) => onEdit(e.target.value)}
+          className={cn("flex-1 rounded-md border border-border bg-background px-2 py-1 text-right text-[12px] focus:border-foreground/30 focus:outline-none", mono && "font-data")}
+        />
+      ) : (
+        <span className={cn("text-right text-[12px] text-foreground", mono && "font-data")}>{value || "—"}</span>
+      )}
     </div>
   );
 }
