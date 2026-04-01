@@ -40,10 +40,10 @@ export interface WizardData {
   incorporationDate: string;
   industry: string;
   capital: string;
-  constitutionFile: File | null;
-  governanceFile: File | null;
-  shareholdingFile: File | null;
-  financialFile: File | null;
+  constitutionFiles: File[];
+  governanceFiles: File[];
+  shareholdingFiles: File[];
+  financialFiles: File[];
   // UBOs detected
   ubos: { name: string; percentage: number; completed: boolean }[];
   // AI extractions
@@ -61,8 +61,8 @@ const INITIAL_DATA: WizardData = {
   fundsFile: null, fundsAmount: "",
   companyName: "", companyType: "", jurisdiction: "", regNumber: "",
   incorporationDate: "", industry: "", capital: "",
-  constitutionFile: null, governanceFile: null,
-  shareholdingFile: null, financialFile: null,
+  constitutionFiles: [], governanceFiles: [],
+  shareholdingFiles: [], financialFiles: [],
   ubos: [], aiExtractions: {}, aiWarnings: [], riskScore: null,
 };
 

@@ -21,11 +21,11 @@ function getChecklist(data: WizardData): CheckItem[] {
   }
   return [
     { label: "Informations société", status: data.companyName ? "green" : "red" },
-    { label: "Documents constitution", status: data.constitutionFile ? "green" : "red" },
-    { label: "Gouvernance", status: data.governanceFile ? "green" : "orange" },
-    { label: "Actionnariat", status: data.shareholdingFile ? "green" : "red" },
+    { label: "Documents constitution", status: data.constitutionFiles?.length ? "green" : "red" },
+    { label: "Gouvernance", status: data.governanceFiles?.length ? "green" : "orange" },
+    { label: "Actionnariat", status: data.shareholdingFiles?.length ? "green" : "red" },
     { label: "UBO identifiés", status: data.ubos.length > 0 ? (data.ubos.every((u) => u.completed) ? "green" : "orange") : "red" },
-    { label: "Documents financiers", status: data.financialFile ? "green" : "orange" },
+    { label: "Documents financiers", status: data.financialFiles?.length ? "green" : "orange" },
     { label: "Screening", status: "orange" },
   ];
 }
@@ -51,7 +51,9 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
 
     // Convert files to base64
     const files: { name: string; type: string; base64: string }[] = [];
-    const fileList = [data.documentFile, data.addressFile, data.fundsFile, data.constitutionFile, data.governanceFile, data.shareholdingFile, data.financialFile].filter(Boolean) as File[];
+    const singleFiles = [data.documentFile, data.addressFile, data.fundsFile].filter(Boolean) as File[];
+    const multiFiles = [...(data.constitutionFiles || []), ...(data.governanceFiles || []), ...(data.shareholdingFiles || []), ...(data.financialFiles || [])];
+    const fileList = [...singleFiles, ...multiFiles];
 
     for (const file of fileList) {
       const base64 = await fileToBase64(file);
