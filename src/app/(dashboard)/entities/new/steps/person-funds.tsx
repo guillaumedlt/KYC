@@ -111,6 +111,9 @@ export function PersonFundsStep({ data, update, next, back }: {
         <p className="text-[12px] text-muted-foreground">
           Uploadez un justificatif (fiche de paie, acte de vente, relevé...). L&apos;IA détecte le type de revenu et extrait les montants.
         </p>
+        <p className="mt-1 text-[10px] text-muted-foreground/70">
+          Vous pouvez passer cette étape et fournir le justificatif plus tard depuis la fiche client.
+        </p>
       </div>
 
       {/* Upload — drag & drop */}
@@ -209,9 +212,18 @@ export function PersonFundsStep({ data, update, next, back }: {
         </div>
       )}
 
-      <div className="flex justify-between pt-2">
+      <div className="flex items-center justify-between pt-2">
         <Button variant="ghost" size="sm" onClick={back} className="h-8 text-[11px]">Retour</Button>
-        <Button size="sm" onClick={next} disabled={!extracted} className="h-8 text-[11px]">Continuer</Button>
+        <div className="flex items-center gap-2">
+          {!extracted && (
+            <button onClick={next} className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
+              Passer pour l&apos;instant
+            </button>
+          )}
+          <Button size="sm" onClick={next} disabled={false} className="h-8 text-[11px]">
+            {extracted ? "Continuer" : "Continuer sans justificatif"}
+          </Button>
+        </div>
       </div>
     </div>
   );

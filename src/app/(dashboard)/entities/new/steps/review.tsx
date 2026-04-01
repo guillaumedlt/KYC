@@ -15,7 +15,7 @@ function getChecklist(data: WizardData): CheckItem[] {
       { label: "Document d'identité", status: data.documentFile ? "green" : "red" },
       { label: "Extraction IA", status: data.firstName ? "green" : "red" },
       { label: "Preuve d'adresse", status: data.addressFile ? "green" : "red" },
-      { label: "Source des fonds", status: data.fundsSource ? "green" : data.fundsFile ? "orange" : "red" },
+      { label: "Source des fonds", status: data.fundsSource ? "green" : data.fundsFile ? "orange" : "orange" },
       { label: "Screening PEP/Sanctions", status: "orange" },
     ];
   }

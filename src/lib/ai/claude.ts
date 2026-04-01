@@ -196,7 +196,7 @@ Choisis le type le PLUS PRÉCIS possible. Par exemple, ne mets pas "proof_of_add
 }
 
 // =============================================================================
-// IDENTITY EXTRACTION — Sonnet (vision capable)
+// IDENTITY EXTRACTION — Opus (best OCR, all languages)
 // =============================================================================
 
 export async function extractIdentity(imageBase64: string, mediaType?: string): Promise<{
@@ -209,42 +209,52 @@ export async function extractIdentity(imageBase64: string, mediaType?: string): 
   documentType: string | null;
   placeOfBirth: string | null;
   gender: string | null;
+  documentLanguage: string | null;
   confidence: number;
   warnings: string[];
 }> {
   const result = await callClaude(
     "extract",
-    `Tu extrais les informations d'un document d'identité (passeport, CNI, titre de séjour).
+    `Tu es un expert en extraction de documents d'identité internationaux. Tu lis TOUTES les langues : latin, arabe, cyrillique, chinois, japonais, coréen, hébreu, thaï, hindi, géorgien, arménien, etc.
 
-RÈGLES IMPORTANTES :
-- firstName : TOUS les prénoms tels qu'ils apparaissent sur le document, séparés par des espaces. Par exemple "Jean Pierre Marie" si 3 prénoms. Ne jamais tronquer.
-- lastName : Le nom de famille complet tel qu'il apparaît sur le document.
-- documentExpiry : La date d'expiration COMPLÈTE au format JJ/MM/AAAA. Si seuls le mois et l'année sont visibles, mettre "01/MM/AAAA". Si la date est passée, ajouter un warning.
-- dateOfBirth : Format JJ/MM/AAAA.
-- nationality : Code ISO 2 lettres (FR, MC, IT, GB, US, etc.). Déduis-le du pays émetteur si non explicite.
-- Ne PAS inventer de données. Si un champ n'est pas lisible, mets null.
+LANGUES ET DOCUMENTS BILINGUES :
+- Beaucoup de documents d'identité sont bilingues (ex: passeport marocain = arabe + français, passeport émirien = arabe + anglais, passeport chinois = chinois + anglais).
+- Utilise la ZONE MRZ (Machine Readable Zone) en bas du document pour vérifier/confirmer les données extraites du texte visuel.
+- Si le document a du texte en 2 langues, extrais les données de la version en CARACTÈRES LATINS quand disponible. Sinon, translittère en caractères latins.
+- Pour les noms en arabe/chinois/cyrillique : utilise la translittération officielle visible sur le document (souvent dans le MRZ ou en 2ème langue). Ne translittère PAS toi-même si une version latine est déjà sur le doc.
+
+RÈGLES D'EXTRACTION :
+- firstName : TOUS les prénoms tels qu'écrits sur le document, séparés par des espaces. Exemple : "Mohammed Ahmed" ou "Jean Pierre Marie". Ne JAMAIS tronquer.
+- lastName : Nom de famille COMPLET. Si le nom contient des particules (von, de, al-, bin, etc.), les inclure.
+- dateOfBirth : Format JJ/MM/AAAA. Convertir depuis tout format (MM/DD/YYYY américain, YYYY/MM/DD asiatique, etc.).
+- documentExpiry : Date d'expiration COMPLÈTE au format JJ/MM/AAAA. Si seuls mois/année visibles, mettre "01/MM/AAAA".
+- nationality : Code ISO 2 lettres. Utilise le code du MRZ si disponible, sinon déduis du pays émetteur.
+- documentLanguage : La ou les langues du document (ex: "ar+fr" pour arabe+français, "zh+en" pour chinois+anglais, "fr" pour français seul).
+- Ne PAS inventer de données. Si illisible, mets null.
 
 Réponds UNIQUEMENT en JSON :
 {
-  "firstName": "TOUS les prénoms séparés par des espaces",
-  "lastName": "NOM DE FAMILLE",
+  "firstName": "TOUS les prénoms en caractères latins",
+  "lastName": "NOM COMPLET en caractères latins",
   "dateOfBirth": "JJ/MM/AAAA",
   "nationality": "CODE ISO 2 lettres",
-  "documentNumber": "numéro du document",
+  "documentNumber": "numéro exact du document",
   "documentExpiry": "JJ/MM/AAAA",
-  "documentType": "passport|national_id|residence_permit",
-  "placeOfBirth": "ville ou lieu de naissance si visible",
+  "documentType": "passport|national_id|residence_permit|driving_license",
+  "placeOfBirth": "ville/lieu de naissance en caractères latins",
   "gender": "M|F ou null",
+  "documentLanguage": "codes langues séparés par + (ex: ar+fr)",
   "confidence": 0-100,
-  "warnings": ["liste de problèmes détectés"]
+  "warnings": ["liste de problèmes"]
 }
 
-Warnings à ajouter automatiquement :
-- Si le document est expiré : "Document expiré depuis le JJ/MM/AAAA"
-- Si le document expire dans moins de 3 mois : "Document expire bientôt (JJ/MM/AAAA)"
-- Si la photo est floue ou illisible : "Photo ou document de mauvaise qualité"
-- Si le MRZ est incohérent avec les champs : "Incohérence MRZ détectée"`,
-    "Extrais toutes les informations de ce document d'identité. Prends TOUS les prénoms.",
+Warnings automatiques :
+- Document expiré : "Document expiré depuis le JJ/MM/AAAA"
+- Expire dans moins de 3 mois : "Document expire bientôt (JJ/MM/AAAA)"
+- Qualité insuffisante : "Document de mauvaise qualité — certains champs illisibles"
+- Incohérence MRZ : "Incohérence entre le MRZ et les données visuelles"
+- Translittération incertaine : "Nom translittéré — vérifier l'orthographe"`,
+    "Extrais toutes les informations de ce document d'identité. Le document peut être dans N'IMPORTE QUELLE LANGUE. Prends TOUS les prénoms. Utilise le MRZ si disponible.",
     imageBase64,
     mediaType,
   );
@@ -252,7 +262,7 @@ Warnings à ajouter automatiquement :
   try {
     return JSON.parse(result.text);
   } catch {
-    return { firstName: null, lastName: null, dateOfBirth: null, nationality: null, documentNumber: null, documentExpiry: null, documentType: null, placeOfBirth: null, gender: null, confidence: 0, warnings: ["Extraction échouée"] };
+    return { firstName: null, lastName: null, dateOfBirth: null, nationality: null, documentNumber: null, documentExpiry: null, documentType: null, placeOfBirth: null, gender: null, documentLanguage: null, confidence: 0, warnings: ["Extraction échouée"] };
   }
 }
 

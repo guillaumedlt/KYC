@@ -84,6 +84,7 @@ export function PersonIdentityStep({
             nationality_detected: result.nationality ?? "",
             place_of_birth: result.placeOfBirth ?? "",
             gender: result.gender ?? "",
+            document_language: result.documentLanguage ?? "",
           },
           aiWarnings: result.warnings ?? [],
         });
