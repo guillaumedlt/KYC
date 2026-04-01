@@ -505,9 +505,144 @@ RÈGLES ACTIONNARIAT — C'EST CRITIQUE :
 }
 
 // =============================================================================
-// PEP/SANCTIONS SCREENING — Haiku (fast + cheap)
+// COMPREHENSIVE SCREENING — Sonnet (PEP + Sanctions + Adverse Media)
 // =============================================================================
 
+export async function screenEntity(params: {
+  name: string;
+  type: "person" | "company";
+  nationality?: string | null;
+  dateOfBirth?: string | null;
+  jurisdiction?: string | null;
+  role?: string | null;
+  aliases?: string[];
+}): Promise<{
+  pep: {
+    match: boolean;
+    level: "none" | "domestic" | "foreign" | "international_org" | "family" | "associate";
+    function: string | null;
+    country: string | null;
+    since: string | null;
+    until: string | null;
+    familyLinks: string[];
+    sources: string[];
+  };
+  sanctions: {
+    match: boolean;
+    risk: "none" | "low" | "medium" | "high" | "critical";
+    lists: { list: string; matchType: string; confidence: number }[];
+    details: string | null;
+    sources: string[];
+  };
+  adverseMedia: {
+    match: boolean;
+    articles: { title: string; source: string; date: string; summary: string; relevance: number }[];
+  };
+  countryRisk: {
+    country: string;
+    gafiFatfStatus: "none" | "grey_list" | "black_list" | "monitored";
+    riskLevel: "low" | "medium" | "high";
+    details: string | null;
+  };
+  overallRisk: "none" | "low" | "medium" | "high" | "critical";
+  summary: string;
+  recommendations: string[];
+  confidence: number;
+}> {
+  const entityDesc = params.type === "person"
+    ? `Personne physique : ${params.name}${params.nationality ? ` (nationalité: ${params.nationality})` : ""}${params.dateOfBirth ? `, né(e) le ${params.dateOfBirth}` : ""}${params.role ? `, fonction: ${params.role}` : ""}`
+    : `Personne morale : ${params.name}${params.jurisdiction ? ` (juridiction: ${params.jurisdiction})` : ""}`;
+
+  const result = await callClaude(
+    "risk_assess",
+    `Tu es un analyste compliance senior spécialisé dans le screening KYC/AML. Tu effectues un screening complet sur une entité.
+
+IMPORTANT : Tu n'as PAS accès aux bases de données PEP/sanctions en temps réel (World-Check, Dow Jones, etc.). Base-toi sur tes connaissances factuelles. Sois honnête sur ton niveau de confiance.
+
+ENTITÉ À SCREENER :
+${entityDesc}
+${params.aliases?.length ? `Aliases connus : ${params.aliases.join(", ")}` : ""}
+
+Effectue ces 4 analyses et réponds UNIQUEMENT en JSON :
+
+{
+  "pep": {
+    "match": false,
+    "level": "none|domestic|foreign|international_org|family|associate",
+    "function": "Titre/fonction officielle si PEP, sinon null",
+    "country": "Pays de la fonction si PEP",
+    "since": "Année de début si connue",
+    "until": "Année de fin si connue, 'en cours' si toujours en poste",
+    "familyLinks": ["Nom et lien de parenté des membres de famille exposés"],
+    "sources": ["Sources d'information utilisées"]
+  },
+  "sanctions": {
+    "match": false,
+    "risk": "none|low|medium|high|critical",
+    "lists": [
+      {"list": "ONU|UE|OFAC|UK_HMT|Monaco|GAFI", "matchType": "exact|partial|alias", "confidence": 0-100}
+    ],
+    "details": "Détails du match si trouvé",
+    "sources": ["Sources"]
+  },
+  "adverseMedia": {
+    "match": false,
+    "articles": [
+      {"title": "Titre de l'article", "source": "Nom du média", "date": "AAAA-MM", "summary": "Résumé en 1-2 phrases", "relevance": 0-100}
+    ]
+  },
+  "countryRisk": {
+    "country": "Code ISO du pays principal lié à l'entité",
+    "gafiFatfStatus": "none|grey_list|black_list|monitored",
+    "riskLevel": "low|medium|high",
+    "details": "Détails sur le statut GAFI du pays si pertinent"
+  },
+  "overallRisk": "none|low|medium|high|critical",
+  "summary": "Résumé en 2-3 phrases de l'analyse complète, en français",
+  "recommendations": [
+    "Actions recommandées pour le compliance officer"
+  ],
+  "confidence": 0-100
+}
+
+RÈGLES :
+1. PEP : Chef d'État, ministre, parlementaire, haut magistrat, dirigeant d'entreprise publique, officier militaire de haut rang, membre de banque centrale. Inclure famille directe et associés proches.
+   - domestic = PEP monégasque ou du pays de résidence
+   - foreign = PEP d'un autre pays
+   - family = conjoint, enfant, parent d'un PEP
+   - associate = associé commercial proche d'un PEP
+
+2. SANCTIONS : Vérifier contre ONU, UE, OFAC, UK HMT, listes Monaco. Pour les sociétés, vérifier aussi les sanctions sectorielles.
+
+3. ADVERSE MEDIA : Rechercher dans tes connaissances toute information médiatique négative (procès, fraude, corruption, blanchiment, sanctions, scandales).
+
+4. COUNTRY RISK : Évaluer le risque pays selon les listes GAFI (liste grise/noire). Monaco est sur la liste grise depuis juin 2024.
+
+5. OVERALL RISK : Agrégation des 4 analyses. Si PEP match → au moins "medium". Si sanctions match → "critical". Si adverse media significatif → "high".
+
+6. RECOMMENDATIONS : Toujours donner des actions concrètes (ex: "Appliquer une vigilance renforcée", "Vérifier l'origine des fonds", "Obtenir l'approbation de la hiérarchie").
+
+7. Si tu n'as aucune information fiable, dis-le clairement dans le summary et mets confidence bas. Ne PAS inventer de résultats.`,
+    `Screening complet de : ${params.name}. Analyse PEP, sanctions, adverse media et risque pays.`,
+  );
+
+  try {
+    return JSON.parse(result.text);
+  } catch {
+    return {
+      pep: { match: false, level: "none", function: null, country: null, since: null, until: null, familyLinks: [], sources: [] },
+      sanctions: { match: false, risk: "none", lists: [], details: null, sources: [] },
+      adverseMedia: { match: false, articles: [] },
+      countryRisk: { country: params.nationality ?? params.jurisdiction ?? "??", gafiFatfStatus: "none", riskLevel: "low", details: null },
+      overallRisk: "none",
+      summary: "Le screening n'a pas pu être complété. Vérification manuelle requise.",
+      recommendations: ["Effectuer un screening manuel via World-Check ou équivalent"],
+      confidence: 0,
+    };
+  }
+}
+
+// Legacy wrapper for backward compatibility
 export async function screenName(name: string, nationality: string | null): Promise<{
   pepMatch: boolean;
   pepDetails: string | null;
@@ -515,26 +650,14 @@ export async function screenName(name: string, nationality: string | null): Prom
   adverseMedia: string | null;
   confidence: number;
 }> {
-  const result = await callClaude(
-    "screen",
-    `Tu es un analyste compliance. Évalue si cette personne est potentiellement un PEP (Personne Politiquement Exposée) ou présente un risque sanctions.
-Réponds UNIQUEMENT en JSON:
-{
-  "pepMatch": true/false,
-  "pepDetails": "description de la fonction si PEP, sinon null",
-  "sanctionsRisk": "none|low|medium|high",
-  "adverseMedia": "résumé si trouvé, sinon null",
-  "confidence": 0-100
-}
-NOTE: Tu n'as pas accès aux bases de données PEP/sanctions en temps réel. Base-toi sur tes connaissances.`,
-    `Personne: ${name}${nationality ? ` (nationalité: ${nationality})` : ""}`,
-  );
-
-  try {
-    return JSON.parse(result.text);
-  } catch {
-    return { pepMatch: false, pepDetails: null, sanctionsRisk: "none", adverseMedia: null, confidence: 0 };
-  }
+  const result = await screenEntity({ name, type: "person", nationality });
+  return {
+    pepMatch: result.pep.match,
+    pepDetails: result.pep.function,
+    sanctionsRisk: result.sanctions.risk === "critical" ? "high" : result.sanctions.risk,
+    adverseMedia: result.adverseMedia.articles.length > 0 ? result.adverseMedia.articles.map((a) => `${a.source}: ${a.summary}`).join(" | ") : null,
+    confidence: result.confidence,
+  };
 }
 
 // =============================================================================
