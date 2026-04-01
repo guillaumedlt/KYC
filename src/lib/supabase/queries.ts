@@ -139,3 +139,49 @@ export async function getDocumentsForEntity(entityId: string) {
     .order("created_at", { ascending: false });
   return data ?? [];
 }
+
+// =============================================================================
+// DOSSIER (Case-centric aggregated view)
+// =============================================================================
+
+export async function getDossierById(caseId: string) {
+  const supabase = await createClient();
+
+  const { data: kycCase } = await supabase
+    .from("kyc_cases")
+    .select("*, entities(*, entity_people(*), entity_companies(*))")
+    .eq("id", caseId)
+    .single();
+
+  if (!kycCase) return null;
+  const entityId = kycCase.entity_id;
+
+  // Relations: get people linked to this entity (dirigeants, actionnaires, UBOs)
+  const { data: relationsFrom } = await supabase
+    .from("entity_relations")
+    .select("*, from_entity:entities!entity_relations_from_entity_id_fkey(*, entity_people(*), entity_companies(*))")
+    .eq("to_entity_id", entityId);
+
+  const { data: relationsTo } = await supabase
+    .from("entity_relations")
+    .select("*, to_entity:entities!entity_relations_to_entity_id_fkey(*, entity_people(*), entity_companies(*))")
+    .eq("from_entity_id", entityId);
+
+  const relations = [...(relationsFrom ?? []), ...(relationsTo ?? [])];
+  const relatedEntityIds = [entityId, ...relations.map(r => r.from_entity_id === entityId ? r.to_entity_id : r.from_entity_id)];
+
+  const [docs, screenings, activities] = await Promise.all([
+    supabase.from("documents").select("*").in("entity_id", relatedEntityIds).order("created_at", { ascending: false }),
+    supabase.from("screenings").select("*, entities(display_name)").in("entity_id", relatedEntityIds).order("created_at", { ascending: false }),
+    supabase.from("activities").select("*").eq("entity_id", entityId).order("created_at", { ascending: false }),
+  ]);
+
+  return {
+    kycCase,
+    entity: kycCase.entities as Record<string, unknown>,
+    relations,
+    documents: docs.data ?? [],
+    screenings: screenings.data ?? [],
+    activities: activities.data ?? [],
+  };
+}

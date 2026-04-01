@@ -11,9 +11,9 @@ import {
 
 const NAV = [
   { section: null, items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
-  { section: "CRM", items: [
-    { href: "/entities", label: "Entités", icon: Users },
-    { href: "/cases", label: "Dossiers", icon: FolderOpen },
+  { section: null, items: [{ href: "/cases", label: "Dossiers KYC", icon: FolderOpen }] },
+  { section: "Donnees", items: [
+    { href: "/entities", label: "Entites", icon: Users },
     { href: "/documents", label: "Documents", icon: FileText },
   ]},
   { section: "Compliance", items: [
@@ -49,7 +49,7 @@ export function Sidebar() {
             {!collapsed && (
               <div className="flex flex-col">
                 <span className="text-[12px] font-medium text-foreground">KYC Monaco</span>
-                <span className="text-[9px] tracking-wider text-muted-foreground">CONFORMITÉ AMSF</span>
+                <span className="text-[9px] tracking-wider text-muted-foreground">CONFORMITE AMSF</span>
               </div>
             )}
           </div>
@@ -94,11 +94,11 @@ export function Sidebar() {
               pathname.startsWith("/settings") ? "bg-foreground text-background" : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
             )}>
             <Settings className="h-[14px] w-[14px] shrink-0" strokeWidth={1.5} />
-            {!collapsed && <span>Paramètres</span>}
+            {!collapsed && <span>Parametres</span>}
           </Link>
           <button onClick={() => setCollapsed((p) => !p)}
             className="hidden h-8 w-full items-center gap-2.5 rounded-md px-2 text-[11px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground lg:flex">
-            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <><ChevronLeft className="h-3.5 w-3.5" /><span>Réduire</span></>}
+            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <><ChevronLeft className="h-3.5 w-3.5" /><span>Reduire</span></>}
           </button>
         </div>
       </aside>
