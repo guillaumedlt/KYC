@@ -11,7 +11,16 @@ import Anthropic from "@anthropic-ai/sdk";
 // Rule: ALWAYS use the cheapest model that can do the job.
 // =============================================================================
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Lazy init — avoid reading env vars at module import time
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_client) {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) throw new Error("ANTHROPIC_API_KEY is not set in environment variables");
+    _client = new Anthropic({ apiKey: key });
+  }
+  return _client;
+}
 
 type TaskType =
   | "classify"        // Haiku — what type of document is this?
@@ -81,7 +90,7 @@ export async function callClaude(
         ]
     : userMessage;
 
-  const response = await client.messages.create({
+  const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
     system: systemPrompt,
@@ -185,7 +194,7 @@ Si un champ n'est pas lisible, mets null. Ajoute un warning si le document expir
 // ADDRESS EXTRACTION — Sonnet
 // =============================================================================
 
-export async function extractAddress(imageBase64: string): Promise<{
+export async function extractAddress(imageBase64: string, mediaType?: string): Promise<{
   address: string | null;
   documentType: string | null;
   documentDate: string | null;
@@ -207,6 +216,7 @@ Réponds UNIQUEMENT en JSON:
 }`,
     "Extrais l'adresse et la date de ce justificatif de domicile.",
     imageBase64,
+    mediaType,
   );
 
   try {
@@ -294,7 +304,7 @@ NOTE: Tu n'as pas accès aux bases de données PEP/sanctions en temps réel. Bas
 // FUNDS SOURCE EXTRACTION — Sonnet
 // =============================================================================
 
-export async function extractFundsSource(imageBase64: string): Promise<{
+export async function extractFundsSource(imageBase64: string, mediaType?: string): Promise<{
   sourceType: string;
   amount: string | null;
   employer: string | null;
@@ -314,6 +324,7 @@ Réponds UNIQUEMENT en JSON:
 }`,
     "Extrais les informations de source de fonds de ce document.",
     imageBase64,
+    mediaType,
   );
 
   try {

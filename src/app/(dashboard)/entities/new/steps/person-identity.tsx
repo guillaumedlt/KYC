@@ -5,7 +5,7 @@ import { Upload, Sparkles, CheckCircle, AlertTriangle, Camera, Loader2, Pencil }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { aiExtractIdentity } from "@/app/actions/ai-extract";
+// Use API route instead of server action (avoids Next.js serialization limit on large base64)
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
@@ -53,9 +53,19 @@ export function PersonIdentityStep({
     try {
       const base64 = await fileToBase64(file);
 
-      // Call AI with timeout
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000));
-      const extractPromise = aiExtractIdentity(base64, file.type);
+      // Call AI via API route (avoids server action serialization limit)
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 60000));
+      const extractPromise = fetch("/api/ai-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "identity", base64, mediaType: file.type }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+      });
       const result = await Promise.race([extractPromise, timeoutPromise]);
 
       if (result && result.confidence > 0) {
@@ -264,12 +274,16 @@ function FieldRow({
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Direct read — no compression, no canvas issues
+    // 780Ko is fine for Claude API (max 20MB)
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      resolve(result.split(",")[1]);
+      const base64 = result.split(",")[1];
+      if (!base64) { reject(new Error("Failed to encode file")); return; }
+      resolve(base64);
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(file);
   });
 }

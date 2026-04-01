@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { Upload, CheckCircle, Loader2, Sparkles, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { aiExtractFunds } from "@/app/actions/ai-extract";
+// Use API route instead of server action
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,40 @@ const FUND_LABELS: Record<string, string> = {
   other: "Autre",
 };
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // PDFs: read directly as base64
+    if (file.type === "application/pdf") {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(",")[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    // Images: compress to max 1600px wide, JPEG 85% quality
+    // Saves bandwidth + Claude API tokens
+    const img = new Image();
+    img.onload = () => {
+      const MAX_WIDTH = 1600;
+      const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas not supported")); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      resolve(dataUrl.split(",")[1]);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export function PersonFundsStep({ data, update, next, back }: {
   data: WizardData; update: (d: Partial<WizardData>) => void; next: () => void; back: () => void;
 }) {
@@ -25,16 +59,28 @@ export function PersonFundsStep({ data, update, next, back }: {
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function processFile(file: File) {
+  async function processFile(file: File) {
     if (!file) return;
     update({ fundsFile: file });
     setAnalyzing(true);
     setExtracted(false);
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      const result = await aiExtractFunds(base64);
+    try {
+      const base64 = await fileToBase64(file);
+      // Images are compressed to JPEG, PDFs stay as-is
+      const mediaType = file.type === "application/pdf" ? "application/pdf" : "image/jpeg";
+
+      // Call AI with timeout
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 45000));
+      const extractPromise = fetch("/api/ai-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "funds", base64, mediaType }),
+      }).then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      });
+      const result = await Promise.race([extractPromise, timeoutPromise]);
 
       if (result && result.confidence > 0) {
         update({
@@ -51,10 +97,11 @@ export function PersonFundsStep({ data, update, next, back }: {
       } else {
         setEditMode(true);
       }
-      setAnalyzing(false);
-      setExtracted(true);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setEditMode(true);
+    }
+    setAnalyzing(false);
+    setExtracted(true);
   }
 
   return (

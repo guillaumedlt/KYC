@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_ROUTES = ["/login", "/signup"];
+const API_ROUTES_PREFIX = "/api/";
 
 export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,6 +35,11 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
   const isPublic = PUBLIC_ROUTES.some((r) => pathname.startsWith(r));
+
+  // API routes: don't redirect, return 401 if not authenticated
+  if (pathname.startsWith(API_ROUTES_PREFIX)) {
+    return supabaseResponse;
+  }
 
   // Not logged in + trying to access protected route → redirect to login
   if (!user && !isPublic && pathname !== "/") {

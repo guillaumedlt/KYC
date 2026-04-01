@@ -8,9 +8,13 @@ import { extractIdentity, extractAddress, extractFundsSource, extractCompanyDocu
  */
 export async function aiExtractIdentity(base64: string, mediaType?: string) {
   try {
-    return await extractIdentity(base64, mediaType);
+    console.log("[AI Extract] Starting identity extraction, base64 length:", base64.length, "mediaType:", mediaType);
+    const result = await extractIdentity(base64, mediaType);
+    console.log("[AI Extract] Success, confidence:", result.confidence);
+    return result;
   } catch (error) {
-    console.error("AI identity extraction failed:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("[AI Extract] FAILED:", msg);
     return null;
   }
 }
@@ -19,9 +23,9 @@ export async function aiExtractIdentity(base64: string, mediaType?: string) {
  * Extract address from proof of address.
  * Uses Claude Sonnet with vision — ~$0.01 per call.
  */
-export async function aiExtractAddress(base64: string) {
+export async function aiExtractAddress(base64: string, mediaType?: string) {
   try {
-    return await extractAddress(base64);
+    return await extractAddress(base64, mediaType);
   } catch (error) {
     console.error("AI address extraction failed:", error);
     return null;
@@ -32,9 +36,9 @@ export async function aiExtractAddress(base64: string) {
  * Extract funds source from financial document.
  * Uses Claude Sonnet with vision — ~$0.01 per call.
  */
-export async function aiExtractFunds(base64: string) {
+export async function aiExtractFunds(base64: string, mediaType?: string) {
   try {
-    return await extractFundsSource(base64);
+    return await extractFundsSource(base64, mediaType);
   } catch (error) {
     console.error("AI funds extraction failed:", error);
     return null;
