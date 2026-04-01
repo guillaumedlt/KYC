@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Upload, CheckCircle, Clock, Sparkles, FileText, AlertCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle, Clock, Sparkles, FileText, AlertCircle, AlertTriangle, Upload } from "lucide-react";
 import { getDocuments } from "@/lib/supabase/queries";
 import { cn } from "@/lib/utils";
+import { DocumentDropzone } from "@/components/features/document-dropzone";
 
 const TL: Record<string, string> = { passport: "Passeport", national_id: "CNI", proof_of_address: "Domicile", company_registration: "RCI", articles_of_association: "Statuts", bank_statement: "Relevé", source_of_funds: "Origine fonds", other: "Autre" };
 const ST: Record<string, { label: string; icon: typeof CheckCircle; cls: string }> = {
@@ -42,9 +43,13 @@ export default async function DocumentsPage() {
         <StatCard label="En attente" value={docs.length - verified} color={docs.length - verified > 0 ? "text-amber-600" : undefined} />
       </div>
 
-      <div className="flex cursor-pointer items-center gap-2.5 rounded-md border border-dashed border-border bg-card px-4 py-3 text-[12px] text-muted-foreground transition-colors hover:border-foreground/20">
-        <Upload className="h-3.5 w-3.5" /> Déposer des documents — extraction IA automatique
-      </div>
+      <DocumentDropzone
+        aiExtract
+        extractAction="identity"
+        label="Déposer des documents — extraction IA automatique"
+        sublabel="Glissez-déposez ou cliquez · PDF, JPG, PNG — max 20 Mo"
+        compact
+      />
 
       {docs.length > 0 ? (
         <div className="overflow-x-auto rounded-md border border-border bg-card">
@@ -89,11 +94,12 @@ export default async function DocumentsPage() {
           </table>
         </div>
       ) : (
-        <div className="rounded-md border border-dashed border-border bg-card px-6 py-10 text-center">
-          <Upload className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-          <p className="text-[12px] text-muted-foreground">Aucun document</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground/60">Commencez par créer un client via &quot;Nouveau client&quot;</p>
-        </div>
+        <DocumentDropzone
+          aiExtract
+          extractAction="identity"
+          label="Aucun document — déposez vos premiers fichiers"
+          sublabel="L'IA classifie et extrait automatiquement · PDF, JPG, PNG"
+        />
       )}
     </div>
   );
