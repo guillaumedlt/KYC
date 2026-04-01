@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createReadOnlyClient as createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import {
   extractIdentity,

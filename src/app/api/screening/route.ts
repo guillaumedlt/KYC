@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { screenEntity } from "@/lib/ai/claude";
-import { createClient } from "@/lib/supabase/server";
+import { createReadOnlyClient as createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 

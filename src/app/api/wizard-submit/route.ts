@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createReadOnlyClient as createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
