@@ -84,21 +84,28 @@ export function CompanyDocsStep({ data, update, next, back }: {
       if (result && result.confidence > 0) {
         const updates: Partial<WizardData> = {};
 
-        // Auto-fill (merge — don't overwrite existing)
+        // Auto-fill company info (merge — don't overwrite existing)
         if (result.companyName && !data.companyName) updates.companyName = result.companyName;
         if (result.registrationNumber && !data.regNumber) updates.regNumber = result.registrationNumber;
         if (result.jurisdiction && !data.jurisdiction) updates.jurisdiction = result.jurisdiction;
-        if (result.incorporationDate && !data.incorporationDate) updates.incorporationDate = result.incorporationDate;
         if (result.companyType && !data.companyType) updates.companyType = result.companyType;
         if (result.capital && !data.capital) updates.capital = result.capital;
+        // Objet social → industry field
+        if (result.businessObject && !data.industry) updates.industry = result.businessObject;
 
-        // Merge directors
-        if (result.directors?.length > 0) {
+        // Merge persons (with roles) into UBOs
+        if (result.persons?.length > 0) {
           const existing = (data.ubos || []).map((u) => u.name.toLowerCase());
-          const newOnes = result.directors
-            .filter((d: string) => !existing.includes(d.toLowerCase()))
-            .map((d: string) => ({ name: d, percentage: 0, completed: false }));
-          if (newOnes.length > 0) updates.ubos = [...(data.ubos || []), ...newOnes];
+          const newPersons = result.persons
+            .filter((p: { name: string }) => !existing.includes(p.name.toLowerCase()))
+            .map((p: { name: string; role: string; nationality?: string }) => ({
+              name: p.name,
+              percentage: 0,
+              completed: false,
+              role: p.role,
+              nationality: p.nationality,
+            }));
+          if (newPersons.length > 0) updates.ubos = [...(data.ubos || []), ...newPersons];
         }
 
         // Merge shareholders
@@ -106,18 +113,33 @@ export function CompanyDocsStep({ data, update, next, back }: {
           const existing = (updates.ubos || data.ubos || []).map((u) => u.name.toLowerCase());
           const newOnes = result.shareholders
             .filter((s: { name: string }) => !existing.includes(s.name.toLowerCase()))
-            .map((s: { name: string; percentage: number }) => ({ name: s.name, percentage: s.percentage, completed: false }));
+            .map((s: { name: string; percentage: number; type: string }) => ({
+              name: s.name,
+              percentage: s.percentage,
+              completed: false,
+              role: s.type === "company" ? "Actionnaire (société)" : "Actionnaire",
+            }));
           if (newOnes.length > 0) updates.ubos = [...(updates.ubos || data.ubos || []), ...newOnes];
         }
 
-        updates.aiExtractions = { ...data.aiExtractions, [`${docType}_${file.name}_confidence`]: String(result.confidence) };
+        // Store extracted data
+        updates.aiExtractions = {
+          ...data.aiExtractions,
+          [`${docType}_${file.name}_confidence`]: String(result.confidence),
+          ...(result.registeredAddress ? { registered_address: result.registeredAddress } : {}),
+          ...(result.businessObject ? { business_object: result.businessObject } : {}),
+        };
+        if (result.warnings?.length > 0) {
+          updates.aiWarnings = [...(data.aiWarnings || []), ...result.warnings];
+        }
         update(updates);
 
         const details = [
           result.companyName,
           result.registrationNumber && `N° ${result.registrationNumber}`,
           result.capital,
-          result.directors?.length && `${result.directors.length} dirigeant(s)`,
+          result.registeredAddress && `Siège: ${result.registeredAddress.slice(0, 40)}...`,
+          result.persons?.length && `${result.persons.length} personne(s)`,
           result.shareholders?.length && `${result.shareholders.length} actionnaire(s)`,
         ].filter(Boolean).join(" · ");
 
@@ -276,16 +298,23 @@ export function CompanyDocsStep({ data, update, next, back }: {
             <FieldRow label="Juridiction" value={COUNTRY_LABELS[data.jurisdiction] || data.jurisdiction} editing={editMode} onEdit={(v) => update({ jurisdiction: v })} editValue={data.jurisdiction} />
             <FieldRow label="N° registre" value={data.regNumber} mono editing={editMode} onEdit={(v) => update({ regNumber: v })} />
             <FieldRow label="Capital" value={data.capital} mono editing={editMode} onEdit={(v) => update({ capital: v })} />
-            <FieldRow label="Date immatriculation" value={data.incorporationDate} mono editing={editMode} onEdit={(v) => update({ incorporationDate: v })} />
-            <FieldRow label="Secteur" value={data.industry} editing={editMode} onEdit={(v) => update({ industry: v })} />
+            {data.aiExtractions.registered_address && (
+              <FieldRow label="Siège social" value={data.aiExtractions.registered_address} editing={false} />
+            )}
+            <FieldRow label="Objet social / Activité" value={data.industry} editing={editMode} onEdit={(v) => update({ industry: v })} />
           </div>
           {data.ubos.length > 0 && (
             <div className="border-t border-border px-4 py-2">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Personnes identifiées ({data.ubos.length})</p>
               {data.ubos.map((ubo, i) => (
-                <div key={i} className="flex items-center justify-between py-0.5 text-[11px]">
-                  <span className="text-foreground">{ubo.name}</span>
-                  <span className="font-data text-muted-foreground">{ubo.percentage > 0 ? `${ubo.percentage}%` : "Dirigeant"}</span>
+                <div key={i} className="flex items-center justify-between py-1 text-[11px]">
+                  <div className="flex flex-col">
+                    <span className="text-foreground">{ubo.name}</span>
+                    {ubo.role && <span className="text-[9px] text-muted-foreground">{ubo.role}{ubo.nationality ? ` · ${ubo.nationality}` : ""}</span>}
+                  </div>
+                  <span className="font-data text-muted-foreground shrink-0">
+                    {ubo.percentage > 0 ? `${ubo.percentage}%` : ""}
+                  </span>
                 </div>
               ))}
             </div>

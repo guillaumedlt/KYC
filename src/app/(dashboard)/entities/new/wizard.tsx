@@ -45,7 +45,7 @@ export interface WizardData {
   shareholdingFiles: File[];
   financialFiles: File[];
   // UBOs detected
-  ubos: { name: string; percentage: number; completed: boolean }[];
+  ubos: { name: string; percentage: number; completed: boolean; role?: string; nationality?: string }[];
   // AI extractions
   aiExtractions: Record<string, string>;
   aiWarnings: string[];

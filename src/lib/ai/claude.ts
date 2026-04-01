@@ -43,7 +43,7 @@ const MODEL_MAP: Record<TaskType, string> = {
 
 const MAX_TOKENS_MAP: Record<TaskType, number> = {
   classify: 200,
-  extract: 1500,
+  extract: 2500,
   screen: 300,
   risk_assess: 1000,
   summarize: 500,
@@ -318,43 +318,83 @@ Warnings automatiques :
 }
 
 // =============================================================================
-// COMPANY EXTRACTION — Sonnet
+// COMPANY EXTRACTION — Opus (best accuracy, all languages)
 // =============================================================================
 
 export async function extractCompanyDocument(imageBase64: string, docType: string): Promise<{
   companyName: string | null;
   registrationNumber: string | null;
   jurisdiction: string | null;
-  incorporationDate: string | null;
   companyType: string | null;
   capital: string | null;
-  directors: string[];
-  shareholders: { name: string; percentage: number }[];
+  registeredAddress: string | null;
+  businessObject: string | null;
+  persons: { name: string; role: string; nationality?: string }[];
+  shareholders: { name: string; percentage: number; type: string }[];
   confidence: number;
+  warnings: string[];
 }> {
   const result = await callClaude(
     "extract",
-    `Tu extrais les informations d'un document de société (${docType}).
-Réponds UNIQUEMENT en JSON:
+    `Tu es un expert en extraction de documents de société internationaux. Tu lis TOUTES les langues.
+
+DOCUMENT : ${docType}
+
+EXTRACTION REQUISE — Réponds UNIQUEMENT en JSON :
 {
-  "companyName": "...",
-  "registrationNumber": "...",
-  "jurisdiction": "CODE ISO 2 lettres",
-  "incorporationDate": "JJ/MM/AAAA",
-  "companyType": "sam|sarl|sci|sa|sas|ltd|llc|other",
-  "capital": "montant avec devise",
-  "directors": ["nom1", "nom2"],
-  "shareholders": [{"name": "...", "percentage": 25}],
-  "confidence": 0-100
-}`,
-    `Extrais les informations de ce document de société (${docType}).`,
+  "companyName": "Raison sociale complète",
+  "registrationNumber": "Numéro RCI, Kbis, Company Number, etc.",
+  "jurisdiction": "CODE ISO 2 lettres du pays d'immatriculation",
+  "companyType": "sam|sarl|sci|sa|sas|sca|snc|ltd|llc|gmbh|ag|bv|other",
+  "capital": "Montant avec devise (ex: 500 000 EUR)",
+  "registeredAddress": "Adresse COMPLÈTE du siège social telle qu'elle apparaît sur le document",
+  "businessObject": "Objet social / activité de la société tel que décrit dans le document. Copier le texte exact si visible.",
+  "persons": [
+    {
+      "name": "NOM Prénom(s) complet",
+      "role": "Rôle EXACT tel qu'indiqué sur le document",
+      "nationality": "CODE ISO 2 lettres si mentionnée"
+    }
+  ],
+  "shareholders": [
+    {
+      "name": "Nom de l'actionnaire (personne ou société)",
+      "percentage": 25,
+      "type": "person|company"
+    }
+  ],
+  "confidence": 0-100,
+  "warnings": ["liste de problèmes"]
+}
+
+RÈGLES IMPORTANTES :
+
+1. SIÈGE SOCIAL (registeredAddress) : Extrais l'adresse complète. Pour Monaco : numéro, rue, 98000 Monaco. Pour d'autres pays : adresse complète avec code postal et ville.
+
+2. OBJET SOCIAL (businessObject) : Copie le texte de l'objet social tel qu'il apparaît. Si c'est un extrait RCI/Kbis, il y a souvent une rubrique "Activité" ou "Objet". Si c'est des statuts, cherche l'article sur l'objet social.
+
+3. PERSONNES — Extrais TOUTES les personnes mentionnées avec leur RÔLE EXACT :
+   Rôles courants à Monaco : "Administrateur Délégué", "Gérant", "Président", "Directeur Général", "Commissaire aux Comptes", "Associé Gérant", "Représentant Légal"
+   Rôles France : "Président", "Directeur Général", "Gérant", "Commissaire aux Comptes"
+   Rôles UK : "Director", "Secretary", "Person with Significant Control"
+   Rôles US : "CEO", "President", "Secretary", "Registered Agent", "Member", "Manager"
+   Rôles Suisse : "Administrateur", "Directeur", "Fondé de procuration"
+   Rôles Luxembourg : "Gérant", "Administrateur", "Commissaire"
+   → Ne PAS simplifier le rôle. Si le document dit "Administrateur Délégué", ne mets pas juste "Administrateur".
+
+4. ACTIONNAIRES : Extrais avec le pourcentage et le type (personne physique ou morale).
+
+5. NE PAS extraire la date d'immatriculation.
+
+6. MULTI-LANGUE : Le document peut être en n'importe quelle langue. Translittère les noms en caractères latins si nécessaire.`,
+    `Extrais toutes les informations de ce document de société. Attention aux rôles exacts des personnes (Administrateur Délégué, Gérant, etc.) et au siège social.`,
     imageBase64,
   );
 
   try {
     return JSON.parse(result.text);
   } catch {
-    return { companyName: null, registrationNumber: null, jurisdiction: null, incorporationDate: null, companyType: null, capital: null, directors: [], shareholders: [], confidence: 0 };
+    return { companyName: null, registrationNumber: null, jurisdiction: null, companyType: null, capital: null, registeredAddress: null, businessObject: null, persons: [], shareholders: [], confidence: 0, warnings: ["Extraction échouée"] };
   }
 }
 
