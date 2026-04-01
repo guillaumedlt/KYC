@@ -21,6 +21,7 @@ import {
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { CaseStatusBadge } from "@/components/features/status-badge";
+import { DocumentReUpload } from "@/components/features/document-reupload";
 import { updatePerson, updateCompany } from "@/app/actions/entities";
 import { cn } from "@/lib/utils";
 import type {
@@ -119,7 +120,7 @@ export function EntityTabs(props: Props) {
       </div>
 
       {tab === "info" && <InfoTab {...props} />}
-      {tab === "documents" && <DocumentsTab documents={props.documents ?? []} entityId={props.entityId} />}
+      {tab === "documents" && <DocumentsTab documents={props.documents ?? []} entityId={props.entityId} entityType={props.entityType} person={props.person} company={props.company} />}
       {tab === "relations" && <RelationsTab {...props} />}
       {tab === "screening" && <ScreeningTab screenings={props.screenings} entityId={props.entityId} entityName={(props.person?.last_name ? `${props.person.first_name} ${props.person.last_name}` : props.company?.legal_name ?? "") as string} entityType={props.entityType} nationality={(props.person?.nationality ?? props.company?.jurisdiction ?? null) as string | null} />}
       {tab === "cases" && <CasesTab cases={props.cases} />}
@@ -625,9 +626,49 @@ const DOC_CATEGORIES: { label: string; types: string[] }[] = [
   { label: "Société", types: ["company_registration", "governance", "shareholding", "articles_of_association", "financial_statement"] },
 ];
 
-function DocumentsTab({ documents, entityId }: { documents: DocRecord[]; entityId: string }) {
+function DocumentsTab({ documents, entityId, entityType, person, company }: { documents: DocRecord[]; entityId: string; entityType: string; person: EntityPerson | null; company: EntityCompany | null }) {
+  // Build currentData from person or company for the re-upload component
+  const currentData: Record<string, string | null> = {};
+  if (person) {
+    const personRecord = person as unknown as Record<string, string | null>;
+    currentData.first_name = person.first_name ?? null;
+    currentData.last_name = person.last_name ?? null;
+    currentData.nationality = person.nationality ?? null;
+    currentData.date_of_birth = person.date_of_birth ?? null;
+    currentData.place_of_birth = personRecord.place_of_birth ?? null;
+    currentData.gender = personRecord.gender ?? null;
+    currentData.document_number = personRecord.document_number ?? null;
+    currentData.document_expiry = personRecord.document_expiry ?? null;
+    currentData.issuing_country = personRecord.issuing_country ?? null;
+    currentData.address = person.address ?? null;
+    currentData.country_of_residence = person.country_of_residence ?? null;
+    currentData.phone = person.phone ?? null;
+    currentData.email = person.email ?? null;
+    currentData.profession = person.profession ?? null;
+  }
+  if (company) {
+    currentData.legal_name = company.legal_name ?? null;
+    currentData.trading_name = company.trading_name ?? null;
+    currentData.registration_number = company.registration_number ?? null;
+    currentData.jurisdiction = company.jurisdiction ?? null;
+    currentData.company_type = company.company_type ?? null;
+    currentData.industry = company.industry ?? null;
+    currentData.address = company.address ?? null;
+    currentData.phone = company.phone ?? null;
+    currentData.email = company.email ?? null;
+    currentData.website = company.website ?? null;
+    currentData.capital = company.capital ?? null;
+  }
+
+  const reUploadType: "person" | "company" = entityType === "company" ? "company" : "person";
+
   if (documents.length === 0) {
-    return <Empty text="Aucun document" sub="Les documents uploadés lors du parcours KYC apparaîtront ici" />;
+    return (
+      <div className="space-y-4">
+        <DocumentReUpload entityId={entityId} entityType={reUploadType} currentData={currentData} />
+        <Empty text="Aucun document" sub="Les documents uploadés lors du parcours KYC apparaîtront ici" />
+      </div>
+    );
   }
 
   // Group by category
@@ -645,6 +686,8 @@ function DocumentsTab({ documents, entityId }: { documents: DocRecord[]; entityI
 
   return (
     <div className="space-y-4">
+      <DocumentReUpload entityId={entityId} entityType={reUploadType} currentData={currentData} />
+
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{documents.length} document(s)</p>
       </div>
