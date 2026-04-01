@@ -301,24 +301,63 @@ export function CompanyDocsStep({ data, update, next, back }: {
                               </div>
                             )}
 
+                            {/* Ownership chain */}
+                            {r.ownershipChain && (
+                              <div>
+                                <p className="mb-1 text-[9px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Chaîne de détention</p>
+                                <div className="rounded bg-background px-3 py-2 font-data text-[10px] text-foreground leading-relaxed whitespace-pre-wrap">
+                                  {String(r.ownershipChain)}
+                                </div>
+                              </div>
+                            )}
+
                             {shareholders.length > 0 && (
                               <div>
                                 <p className="mb-1 text-[9px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
                                   Actionnariat ({shareholders.length})
                                 </p>
                                 <div className="space-y-1">
-                                  {shareholders.map((s, si) => (
-                                    <div key={si} className="flex items-center justify-between rounded bg-background px-2 py-1">
-                                      <div className="flex items-center gap-1.5">
-                                        {s.type === "company" ? <Building2 className="h-3 w-3 text-muted-foreground" /> : <Users className="h-3 w-3 text-muted-foreground" />}
-                                        <span className="text-[11px] text-foreground">{s.name}</span>
-                                        <span className="text-[9px] text-muted-foreground">{s.type === "company" ? "Société" : "Personne"}</span>
+                                  {shareholders.map((s, si) => {
+                                    const typeLabel = s.type === "company" ? "Société" : s.type === "trust" ? "Trust" : s.type === "foundation" ? "Fondation" : "Personne";
+                                    const typeIcon = s.type === "company" || s.type === "trust" || s.type === "foundation" ? <Building2 className="h-3 w-3 text-muted-foreground" /> : <Users className="h-3 w-3 text-muted-foreground" />;
+                                    const sData = s as Record<string, unknown>;
+                                    const subs = Array.isArray(sData.subsidiaries) ? sData.subsidiaries as { name: string; percentage: number; type: string }[] : [];
+                                    return (
+                                    <div key={si}>
+                                      <div className="flex items-center justify-between rounded bg-background px-2 py-1">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          {typeIcon}
+                                          <div className="min-w-0">
+                                            <span className="text-[11px] text-foreground">{s.name}</span>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-[9px] text-muted-foreground">{typeLabel}</span>
+                                              {String(sData.jurisdiction || "") !== "" && <span className="text-[9px] text-muted-foreground">· {String(sData.jurisdiction)}</span>}
+                                              {String(sData.heldThrough || "") !== "" && <span className="text-[9px] text-amber-600">via {String(sData.heldThrough)}</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <span className={cn("font-data text-[11px] shrink-0", s.percentage >= 25 ? "font-medium text-foreground" : "text-muted-foreground")}>
+                                          {s.percentage}%
+                                        </span>
                                       </div>
-                                      <span className={cn("font-data text-[11px]", s.percentage >= 25 ? "font-medium text-foreground" : "text-muted-foreground")}>
-                                        {s.percentage}%
-                                      </span>
+                                      {/* Sub-shareholders (cascade) */}
+                                      {subs.length > 0 && (
+                                        <div className="ml-6 border-l-2 border-border/50 pl-2 space-y-0.5">
+                                          {subs.map((sub, subi) => (
+                                            <div key={subi} className="flex items-center justify-between text-[10px] py-0.5">
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-muted-foreground">↳</span>
+                                                <span className="text-foreground">{sub.name}</span>
+                                                <span className="text-[8px] text-muted-foreground">{sub.type === "company" ? "Société" : "Personne"}</span>
+                                              </div>
+                                              <span className="font-data text-muted-foreground">{sub.percentage}%</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}

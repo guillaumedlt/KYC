@@ -383,79 +383,91 @@ export async function extractCompanyDocument(imageBase64: string, docType: strin
   registeredAddress: string | null;
   businessObject: string | null;
   persons: { name: string; role: string; nationality?: string }[];
-  shareholders: { name: string; percentage: number; type: string }[];
+  shareholders: { name: string; percentage: number; type: string; jurisdiction?: string; registrationNumber?: string; heldThrough?: string; subsidiaries?: { name: string; percentage: number; type: string }[] }[];
+  ownershipChain: string | null;
   confidence: number;
   warnings: string[];
 }> {
   const result = await callClaude(
     "extract",
-    `Tu es un expert en extraction de documents de société internationaux. Tu lis TOUTES les langues.
+    `Tu es un expert compliance spécialisé dans l'extraction de documents de société et l'analyse de structures capitalistiques complexes.
 
 DOCUMENT : ${docType}
 
-EXTRACTION REQUISE — Réponds UNIQUEMENT en JSON :
+Réponds UNIQUEMENT en JSON :
 {
   "companyName": "Raison sociale complète",
-  "registrationNumber": "Numéro RCI, Kbis, Company Number, etc.",
-  "jurisdiction": "CODE ISO 2 lettres du pays d'immatriculation",
+  "registrationNumber": "N° RCI/Kbis/Company Number",
+  "jurisdiction": "CODE ISO 2 lettres",
   "companyType": "sam|sarl|sci|sa|sas|sca|snc|ltd|llc|gmbh|ag|bv|other",
-  "capital": "Montant avec devise (ex: 500 000 EUR)",
-  "registeredAddress": "Adresse COMPLÈTE du siège social telle qu'elle apparaît sur le document",
-  "businessObject": "Objet social / activité de la société tel que décrit dans le document. Copier le texte exact si visible.",
+  "capital": "Montant avec devise",
+  "registeredAddress": "Adresse COMPLÈTE du siège social",
+  "businessObject": "Objet social tel que dans le document",
   "persons": [
-    {
-      "name": "NOM Prénom(s) complet",
-      "role": "Rôle EXACT tel qu'indiqué sur le document",
-      "nationality": "CODE ISO 2 lettres si mentionnée"
-    }
+    {"name": "NOM Prénom(s)", "role": "Rôle EXACT du document", "nationality": "XX"}
   ],
   "shareholders": [
     {
-      "name": "Nom de l'actionnaire (personne ou société)",
-      "percentage": 25,
-      "type": "person|company"
+      "name": "Nom actionnaire",
+      "percentage": 65,
+      "type": "person|company|trust|foundation",
+      "jurisdiction": "XX si société étrangère",
+      "registrationNumber": "numéro si visible",
+      "heldThrough": "nom de l'intermédiaire si détention indirecte",
+      "subsidiaries": [
+        {"name": "sous-actionnaire si visible", "percentage": 100, "type": "person|company"}
+      ]
     }
   ],
+  "ownershipChain": "Description textuelle de la chaîne de détention si complexe. Ex: 'M. Dupont (100%) → Holding Alpha SA (65%) → Société Cible SAM'",
   "confidence": 0-100,
-  "warnings": ["liste de problèmes"]
+  "warnings": []
 }
 
-RÈGLES IMPORTANTES :
+RÈGLES ACTIONNARIAT — C'EST CRITIQUE :
 
-1. SIÈGE SOCIAL (registeredAddress) : Extrais l'adresse complète. Pour Monaco : numéro, rue, 98000 Monaco. Pour d'autres pays : adresse complète avec code postal et ville.
+1. POURCENTAGES : Extrais le % EXACT de chaque actionnaire. Si le document dit "parts sociales" ou "actions", calcule le % à partir du nombre de parts vs capital total. Si un actionnaire a 650 parts sur 1000, c'est 65%.
 
-2. OBJET SOCIAL (businessObject) : Copie le texte de l'objet social tel qu'il apparaît. Si c'est un extrait RCI/Kbis, il y a souvent une rubrique "Activité" ou "Objet". Si c'est des statuts, cherche l'article sur l'objet social.
+2. TYPE D'ACTIONNAIRE :
+   - "person" : Personne physique (M. Dupont, Mme Martin)
+   - "company" : Société (Holding XYZ SA, Riviera Invest LLC)
+   - "trust" : Trust, fiducie (The Moretti Family Trust)
+   - "foundation" : Fondation (Fondation ABC)
 
-3. PERSONNES — Extrais TOUTES les personnes mentionnées avec leur RÔLE EXACT :
-   Rôles courants à Monaco : "Administrateur Délégué", "Gérant", "Président", "Directeur Général", "Commissaire aux Comptes", "Associé Gérant", "Représentant Légal"
-   Rôles France : "Président", "Directeur Général", "Gérant", "Commissaire aux Comptes"
-   Rôles UK : "Director", "Secretary", "Person with Significant Control"
-   Rôles US : "CEO", "President", "Secretary", "Registered Agent", "Member", "Manager"
-   Rôles Suisse : "Administrateur", "Directeur", "Fondé de procuration"
-   Rôles Luxembourg : "Gérant", "Administrateur", "Commissaire"
-   → Ne PAS simplifier le rôle. Si le document dit "Administrateur Délégué", ne mets pas juste "Administrateur".
+3. STRUCTURES EN CASCADE / HOLDINGS :
+   Si le document montre une chaîne de détention :
+   Exemple : "Holding Alpha SA (Luxembourg) détient 65% → détenue à 100% par M. Jean Dupont"
+   → shareholders: [{"name": "Holding Alpha SA", "percentage": 65, "type": "company", "jurisdiction": "LU", "subsidiaries": [{"name": "Jean DUPONT", "percentage": 100, "type": "person"}]}]
+   → ownershipChain: "Jean DUPONT (100%) → Holding Alpha SA [LU] (65%) → [Société Cible]"
 
-4. ACTIONNAIRES ET STRUCTURES COMPLEXES :
-   - Extrais CHAQUE actionnaire avec son pourcentage et son type (personne physique ou morale).
-   - Si un actionnaire est une SOCIÉTÉ (holding, SPV, etc.) : indique type="company" et le nom exact de la société.
-   - Structures en cascade : Si Société A détient Société B qui détient la cible, extrais chaque niveau visible dans le document.
-   - Holdings : Si le document mentionne une holding qui détient X%, note-la comme actionnaire type="company".
-   - Trusts : Si un trust est actionnaire, note-le avec type="company" et précise "(Trust)" dans le nom.
-   - Actions au porteur : Ajoute un warning "Actions au porteur détectées — identification UBO requise".
-   - Nominee shareholders : Ajoute un warning "Actionnaire nominee détecté — identifier le bénéficiaire réel".
-   - Si la chaîne de détention est complexe ou opaque, ajoute un warning "Structure de détention complexe — investigation complémentaire requise".
+4. DÉTENTION INDIRECTE :
+   Si M. X détient via une société intermédiaire, renseigne "heldThrough".
+   Exemple : M. X détient 30% via SCI Patrimoine
+   → {"name": "M. X", "percentage": 30, "type": "person", "heldThrough": "SCI Patrimoine"}
 
-5. NE PAS extraire la date d'immatriculation.
+5. CAS SPÉCIAUX — ajouter un warning :
+   - Actions au porteur → "Actions au porteur détectées — UBO non identifiable"
+   - Nominee/prête-nom → "Actionnaire nominee — identifier le bénéficiaire réel"
+   - Trust opaque → "Trust sans bénéficiaire identifié — investigation requise"
+   - Juridiction à risque → "Actionnaire dans une juridiction à risque (XXX)"
+   - % qui ne totalisent pas 100% → "Total actionnariat = XX% — parts manquantes"
+   - Démembrement (usufruit/nue-propriété) → "Démembrement de propriété détecté"
 
-6. MULTI-LANGUE : Le document peut être en n'importe quelle langue. Translittère les noms en caractères latins si nécessaire.`,
-    `Extrais toutes les informations de ce document de société. Attention aux rôles exacts des personnes (Administrateur Délégué, Gérant, etc.), au siège social, et aux structures d'actionnariat complexes (holdings, sociétés en cascade, trusts).`,
+6. PERSONNES — rôle EXACT tel que sur le document (Administrateur Délégué, pas Administrateur).
+
+7. SIÈGE SOCIAL — adresse complète.
+
+8. OBJET SOCIAL — texte exact du document.
+
+9. NE PAS extraire la date d'immatriculation.`,
+    `Extrais toutes les informations. SURTOUT l'actionnariat avec les % exacts, les structures de holding/cascade, et les rôles exacts des personnes.`,
     imageBase64,
   );
 
   try {
     return JSON.parse(result.text);
   } catch {
-    return { companyName: null, registrationNumber: null, jurisdiction: null, companyType: null, capital: null, registeredAddress: null, businessObject: null, persons: [], shareholders: [], confidence: 0, warnings: ["Extraction échouée"] };
+    return { companyName: null, registrationNumber: null, jurisdiction: null, companyType: null, capital: null, registeredAddress: null, businessObject: null, persons: [], shareholders: [], ownershipChain: null, confidence: 0, warnings: ["Extraction échouée"] };
   }
 }
 
