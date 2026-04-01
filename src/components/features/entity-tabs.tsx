@@ -44,7 +44,20 @@ const RELATION_LABELS: Record<string, string> = {
   authorized_signatory: "Signataire autorisé",
 };
 
-type Tab = "info" | "relations" | "screening" | "cases" | "timeline";
+type Tab = "info" | "documents" | "relations" | "screening" | "cases" | "timeline";
+
+interface DocRecord {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  file_size: number | null;
+  mime_type: string | null;
+  extraction_confidence: number | null;
+  verified_by: string | null;
+  created_at: string;
+  storage_path: string | null;
+}
 
 interface Props {
   entityId: string;
@@ -57,10 +70,12 @@ interface Props {
   screenings: Screening[];
   riskFactors: RiskFactor[];
   allEntities: Entity[];
+  documents?: DocRecord[];
 }
 
 const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: "info", label: "Informations", icon: FileText },
+  { key: "documents", label: "Documents", icon: FileText },
   { key: "relations", label: "Relations", icon: Link2 },
   { key: "screening", label: "Screening", icon: Search },
   { key: "cases", label: "Dossiers", icon: FileText },
@@ -103,6 +118,7 @@ export function EntityTabs(props: Props) {
       </div>
 
       {tab === "info" && <InfoTab {...props} />}
+      {tab === "documents" && <DocumentsTab documents={props.documents ?? []} entityId={props.entityId} />}
       {tab === "relations" && <RelationsTab {...props} />}
       {tab === "screening" && <ScreeningTab screenings={props.screenings} />}
       {tab === "cases" && <CasesTab cases={props.cases} />}
@@ -480,6 +496,116 @@ function Empty({ text, sub }: { text: string; sub?: string }) {
     <div className="flex flex-col items-center justify-center rounded bg-muted/30 py-10">
       <p className="text-[11px] text-muted-foreground">{text}</p>
       {sub && <p className="mt-0.5 text-[10px] text-muted-foreground/60">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Documents Tab ──────────────────────────────────────────────────
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  passport: "Passeport",
+  national_id: "Carte d'identité",
+  residence_permit: "Titre de séjour",
+  driving_license: "Permis de conduire",
+  identity_additional: "Pièce d'identité (add.)",
+  proof_of_address: "Justificatif de domicile",
+  proof_of_address_electricity: "Facture électricité",
+  proof_of_address_water: "Facture eau",
+  proof_of_address_gas: "Facture gaz",
+  proof_of_address_telecom: "Facture télécom",
+  proof_of_address_tax: "Avis d'imposition",
+  proof_of_address_rent: "Quittance de loyer",
+  proof_of_address_insurance: "Attestation assurance",
+  source_of_funds: "Source des fonds",
+  company_registration: "Immatriculation société",
+  governance: "Gouvernance",
+  shareholding: "Actionnariat",
+  articles_of_association: "Statuts",
+  financial_statement: "Document financier",
+  bank_statement: "Relevé bancaire",
+  payslip: "Fiche de paie",
+  other: "Autre document",
+};
+
+const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  uploaded: { label: "Uploadé", color: "text-muted-foreground" },
+  processing: { label: "Analyse IA...", color: "text-blue-600" },
+  extracted: { label: "Extrait", color: "text-amber-600" },
+  verified: { label: "Vérifié", color: "text-emerald-600" },
+  rejected: { label: "Rejeté", color: "text-red-600" },
+};
+
+const DOC_CATEGORIES: { label: string; types: string[] }[] = [
+  { label: "Identité", types: ["passport", "national_id", "residence_permit", "driving_license", "identity_additional"] },
+  { label: "Domicile", types: ["proof_of_address", "proof_of_address_electricity", "proof_of_address_water", "proof_of_address_gas", "proof_of_address_telecom", "proof_of_address_tax", "proof_of_address_rent", "proof_of_address_insurance"] },
+  { label: "Revenus / Fonds", types: ["source_of_funds", "payslip", "bank_statement"] },
+  { label: "Société", types: ["company_registration", "governance", "shareholding", "articles_of_association", "financial_statement"] },
+];
+
+function DocumentsTab({ documents, entityId }: { documents: DocRecord[]; entityId: string }) {
+  if (documents.length === 0) {
+    return <Empty text="Aucun document" sub="Les documents uploadés lors du parcours KYC apparaîtront ici" />;
+  }
+
+  // Group by category
+  const grouped: { label: string; docs: DocRecord[] }[] = DOC_CATEGORIES
+    .map((cat) => ({
+      label: cat.label,
+      docs: documents.filter((d) => cat.types.includes(d.type)),
+    }))
+    .filter((g) => g.docs.length > 0);
+
+  // Uncategorized
+  const categorizedTypes = DOC_CATEGORIES.flatMap((c) => c.types);
+  const uncategorized = documents.filter((d) => !categorizedTypes.includes(d.type));
+  if (uncategorized.length > 0) grouped.push({ label: "Autres", docs: uncategorized });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{documents.length} document(s)</p>
+      </div>
+
+      {grouped.map((group) => (
+        <div key={group.label}>
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{group.label}</p>
+          <div className="rounded-md border border-border bg-card divide-y divide-border/50">
+            {group.docs.map((doc) => {
+              const typeLabel = DOC_TYPE_LABELS[doc.type] ?? doc.type;
+              const statusInfo = DOC_STATUS_LABELS[doc.status] ?? DOC_STATUS_LABELS.uploaded;
+              const sizeStr = doc.file_size ? (doc.file_size > 1e6 ? `${(doc.file_size / 1e6).toFixed(1)} Mo` : `${(doc.file_size / 1024).toFixed(0)} Ko`) : "";
+              const dateStr = doc.created_at ? new Date(doc.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+
+              return (
+                <div key={doc.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/10">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[11px] font-medium text-foreground">{typeLabel}</span>
+                        <span className="shrink-0 font-data text-[9px] text-muted-foreground">{sizeStr}</span>
+                      </div>
+                      <span className="text-[9px] text-muted-foreground truncate block">{doc.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {doc.extraction_confidence != null && (
+                      <div className="flex items-center gap-1">
+                        <div className="h-1 w-8 rounded-full bg-muted">
+                          <div className={cn("h-1 rounded-full", doc.extraction_confidence >= 90 ? "bg-emerald-500" : doc.extraction_confidence >= 70 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${doc.extraction_confidence}%` }} />
+                        </div>
+                        <span className="font-data text-[9px] text-muted-foreground">{doc.extraction_confidence}%</span>
+                      </div>
+                    )}
+                    <span className={cn("text-[9px]", statusInfo.color)}>{statusInfo.label}</span>
+                    <span className="font-data text-[9px] text-muted-foreground">{dateStr}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

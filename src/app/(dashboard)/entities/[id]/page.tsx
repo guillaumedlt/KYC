@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, User, Building2, Landmark } from "lucide-react";
-import { getEntityById, getRelationsForEntity, getCasesForEntity, getActivitiesForEntity, getScreeningsForEntity, getEntities } from "@/lib/supabase/queries";
+import { getEntityById, getRelationsForEntity, getCasesForEntity, getActivitiesForEntity, getScreeningsForEntity, getEntities, getDocumentsForEntity } from "@/lib/supabase/queries";
 import { KycStatusBadge, RiskBadge } from "@/components/features/status-badge";
 import { EntityActions } from "@/components/features/entity-actions";
 import { EntityTabs } from "@/components/features/entity-tabs";
@@ -21,12 +21,13 @@ export default async function EntityDetailPage({ params }: { params: Promise<{ i
   const entity = await getEntityById(id);
   if (!entity) notFound();
 
-  const [relations, cases, activities, screenings, allEntities] = await Promise.all([
+  const [relations, cases, activities, screenings, allEntities, documents] = await Promise.all([
     getRelationsForEntity(id),
     getCasesForEntity(id),
     getActivitiesForEntity(id),
     getScreeningsForEntity(id),
     getEntities(),
+    getDocumentsForEntity(id),
   ]);
 
   // Risk factors still from mock (will be computed by AI later)
@@ -72,6 +73,7 @@ export default async function EntityDetailPage({ params }: { params: Promise<{ i
         <MiniStat label="Screening" value={matchCount > 0 ? `${matchCount} match` : screenings.length > 0 ? "Clean" : "—"} />
         <MiniStat label="Relations" value={String(relations.length)} />
         <MiniStat label="Dossiers" value={String(cases.length)} />
+        <MiniStat label="Documents" value={String(documents.length)} />
       </div>
 
       <EntityTabs
@@ -79,6 +81,7 @@ export default async function EntityDetailPage({ params }: { params: Promise<{ i
         person={person} company={company}
         relations={relations} cases={cases} activities={activities}
         screenings={screenings} riskFactors={riskFactors} allEntities={allEntities}
+        documents={documents}
       />
     </div>
   );

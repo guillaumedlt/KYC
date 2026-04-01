@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     // Handle file upload action (separate from entity creation)
     if (data.action === "upload-file" && data.entityId && data.file) {
       const file = data.file;
-      const storagePath = `${TENANT_ID}/${data.entityId}/${Date.now()}_${file.name}`;
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const storagePath = `${TENANT_ID}/${data.entityId}/${file.docType || "other"}/${new Date().toISOString().slice(0, 10)}_${sanitizedName}`;
       const buffer = Buffer.from(file.base64, "base64");
 
       const { error: uploadErr } = await supabase.storage
