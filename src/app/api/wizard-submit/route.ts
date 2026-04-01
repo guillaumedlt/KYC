@@ -13,6 +13,37 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const data = await request.json();
+
+    // Handle file upload action (separate from entity creation)
+    if (data.action === "upload-file" && data.entityId && data.file) {
+      const file = data.file;
+      const storagePath = `${TENANT_ID}/${data.entityId}/${Date.now()}_${file.name}`;
+      const buffer = Buffer.from(file.base64, "base64");
+
+      const { error: uploadErr } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, buffer, {
+          contentType: file.type?.includes("pdf") ? "application/pdf" : "image/jpeg",
+        });
+
+      if (!uploadErr) {
+        await supabase.from("documents").insert({
+          tenant_id: TENANT_ID,
+          entity_id: data.entityId,
+          name: file.name,
+          type: file.docType || "other",
+          status: "extracted",
+          storage_path: storagePath,
+          file_size: buffer.length,
+          mime_type: file.type?.includes("pdf") ? "application/pdf" : "image/jpeg",
+          verified_by: "ai_agent",
+          extraction_confidence: file.confidence || null,
+        });
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
     const isPerson = data.kind === "person";
     const displayName = isPerson
       ? `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim()

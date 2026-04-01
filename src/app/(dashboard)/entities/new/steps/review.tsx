@@ -52,36 +52,8 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
     setError(null);
 
     try {
-      // Convert files to base64
-      setProgress("Préparation des fichiers...");
-      const files: { name: string; type: string; base64: string; docType: string; confidence: number }[] = [];
-
-      const singleFiles: { file: File; docType: string }[] = [];
-      if (data.documentFile) singleFiles.push({ file: data.documentFile, docType: data.documentType || "passport" });
-      for (const f of (data.additionalIdFiles || [])) singleFiles.push({ file: f, docType: "identity_additional" });
-      if (data.addressFile) singleFiles.push({ file: data.addressFile, docType: "proof_of_address" });
-      for (const f of (data.additionalAddressFiles || [])) singleFiles.push({ file: f, docType: "proof_of_address" });
-      if (data.fundsFile) singleFiles.push({ file: data.fundsFile, docType: "source_of_funds" });
-
-      const multiFileEntries: { file: File; docType: string }[] = [
-        ...(data.constitutionFiles || []).map((f) => ({ file: f, docType: "company_registration" })),
-        ...(data.governanceFiles || []).map((f) => ({ file: f, docType: "governance" })),
-        ...(data.shareholdingFiles || []).map((f) => ({ file: f, docType: "shareholding" })),
-        ...(data.financialFiles || []).map((f) => ({ file: f, docType: "financial_statement" })),
-      ];
-
-      const allFiles = [...singleFiles, ...multiFileEntries];
-
-      for (let i = 0; i < allFiles.length; i++) {
-        setProgress(`Encodage fichier ${i + 1}/${allFiles.length}...`);
-        const { file, docType } = allFiles[i];
-        const base64 = await fileToBase64(file);
-        const conf = parseInt(data.aiExtractions?.identity_confidence ?? data.aiExtractions?.address_confidence ?? "0") || 0;
-        files.push({ name: file.name, type: file.type, base64, docType, confidence: conf });
-      }
-
-      // Submit via API route (not server action — avoids serialization limit)
-      setProgress("Création du dossier...");
+      // Step 1: Create entity WITHOUT files (small payload)
+      setProgress("Création de l'entité...");
       const res = await fetch("/api/wizard-submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -106,18 +78,51 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
           ubos: data.ubos,
           riskScore,
           aiExtractions: data.aiExtractions,
-          files,
+          files: [], // No files in step 1
         }),
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
+        throw new Error(err.error || `Erreur création entité (HTTP ${res.status})`);
       }
 
-      const result = await res.json();
+      const { entityId } = await res.json();
+
+      // Step 2: Upload files ONE BY ONE (avoids body size limit)
+      const allFiles: { file: File; docType: string }[] = [];
+      if (data.documentFile) allFiles.push({ file: data.documentFile, docType: data.documentType || "passport" });
+      for (const f of (data.additionalIdFiles || [])) allFiles.push({ file: f, docType: "identity_additional" });
+      if (data.addressFile) allFiles.push({ file: data.addressFile, docType: "proof_of_address" });
+      for (const f of (data.additionalAddressFiles || [])) allFiles.push({ file: f, docType: "proof_of_address" });
+      if (data.fundsFile) allFiles.push({ file: data.fundsFile, docType: "source_of_funds" });
+      for (const f of (data.constitutionFiles || [])) allFiles.push({ file: f, docType: "company_registration" });
+      for (const f of (data.governanceFiles || [])) allFiles.push({ file: f, docType: "governance" });
+      for (const f of (data.shareholdingFiles || [])) allFiles.push({ file: f, docType: "shareholding" });
+      for (const f of (data.financialFiles || [])) allFiles.push({ file: f, docType: "financial_statement" });
+
+      for (let i = 0; i < allFiles.length; i++) {
+        setProgress(`Upload fichier ${i + 1}/${allFiles.length}...`);
+        const { file, docType } = allFiles[i];
+        try {
+          const base64 = await fileToBase64(file);
+          await fetch("/api/wizard-submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "upload-file",
+              entityId,
+              file: { name: file.name, type: file.type, base64, docType, confidence: 0 },
+            }),
+          });
+        } catch {
+          // File upload failed — continue with other files
+          console.error(`Failed to upload ${file.name}`);
+        }
+      }
+
       setProgress("Redirection...");
-      router.push(`/entities/${result.entityId}`);
+      router.push(`/entities/${entityId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de la soumission. Réessayez.");
       setSubmitting(false);
