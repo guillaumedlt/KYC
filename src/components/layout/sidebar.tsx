@@ -11,16 +11,6 @@ import {
 
 const NAV = [
   { section: null, items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
-  { section: null, items: [{ href: "/cases", label: "Dossiers KYC", icon: FolderOpen }] },
-  { section: "Donnees", items: [
-    { href: "/entities", label: "Entites", icon: Users },
-    { href: "/documents", label: "Documents", icon: FileText },
-  ]},
-  { section: "Compliance", items: [
-    { href: "/screening", label: "Screening", icon: Search },
-    { href: "/risk", label: "Risques", icon: Zap },
-    { href: "/reports", label: "Rapports", icon: ClipboardList },
-  ]},
 ];
 
 export function Sidebar() {
