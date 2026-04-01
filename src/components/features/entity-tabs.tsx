@@ -380,6 +380,8 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
 }) {
   const [running, setRunning] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [sourcesChecked, setSourcesChecked] = useState<{ name: string; type: string; url: string; result: string }[]>([]);
+  const [showSources, setShowSources] = useState(false);
 
   async function launchScreening() {
     setRunning(true);
@@ -400,7 +402,9 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
       if (!res.ok) throw new Error("Erreur");
       const result = await res.json();
       setLastResult(result.summary ?? "Screening terminé");
-      window.location.reload();
+      if (result.sourcesChecked) setSourcesChecked(result.sourcesChecked);
+      setShowSources(true);
+      setTimeout(() => window.location.reload(), 3000);
     } catch {
       setLastResult("Erreur lors du screening");
     } finally {
@@ -429,7 +433,59 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
       </div>
 
       {lastResult && (
-        <div className="rounded-md bg-muted/30 px-4 py-2 text-[11px] text-foreground">{lastResult}</div>
+        <div className="rounded-md bg-muted/30 px-4 py-2 text-[11px] text-foreground">
+          <p>{lastResult}</p>
+          {sourcesChecked.length > 0 && (
+            <button onClick={() => setShowSources(!showSources)} className="mt-1 text-[10px] text-muted-foreground underline hover:text-foreground">
+              {showSources ? "Masquer" : "Voir"} les {sourcesChecked.length} sources vérifiées
+            </button>
+          )}
+        </div>
+      )}
+
+      {showSources && sourcesChecked.length > 0 && (
+        <div className="rounded-md border border-border bg-card">
+          <div className="border-b border-border px-4 py-2">
+            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              Sources et bases de données vérifiées ({sourcesChecked.length})
+            </span>
+          </div>
+          <div className="divide-y divide-border/50">
+            {sourcesChecked.map((src, i) => {
+              const isMatch = src.result.toLowerCase().includes("match") && !src.result.toLowerCase().includes("aucun");
+              const isClean = src.result.toLowerCase().includes("aucun") || src.result.toLowerCase().includes("no match") || src.result.toLowerCase().includes("négatif");
+              return (
+                <div key={i} className="flex items-center justify-between px-4 py-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={cn("h-1.5 w-1.5 rounded-full shrink-0",
+                      isMatch ? "bg-red-500" : isClean ? "bg-emerald-500" : "bg-amber-500"
+                    )} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <a href={src.url} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] text-foreground hover:underline truncate">
+                          {src.name}
+                        </a>
+                        <span className="shrink-0 rounded bg-muted px-1 py-px text-[8px] text-muted-foreground">
+                          {src.type === "pep_database" ? "PEP" : src.type === "sanctions_list" ? "Sanctions" : src.type === "media" ? "Média" : src.type === "registry" ? "Registre" : src.type === "fatf" ? "GAFI" : "Autre"}
+                        </span>
+                      </div>
+                      <a href={src.url} target="_blank" rel="noopener noreferrer"
+                        className="text-[9px] text-muted-foreground hover:underline truncate block">
+                        {src.url}
+                      </a>
+                    </div>
+                  </div>
+                  <span className={cn("shrink-0 text-[9px] ml-2",
+                    isMatch ? "text-red-600 font-medium" : isClean ? "text-emerald-600" : "text-amber-600"
+                  )}>
+                    {src.result}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {screenings.length === 0 ? (

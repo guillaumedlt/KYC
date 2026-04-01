@@ -45,7 +45,7 @@ const MAX_TOKENS_MAP: Record<TaskType, number> = {
   classify: 200,
   extract: 2500,
   screen: 300,
-  risk_assess: 1000,
+  risk_assess: 3000,
   summarize: 500,
   report: 2000,
   complex_analysis: 3000,
@@ -544,6 +544,7 @@ export async function screenEntity(params: {
     riskLevel: "low" | "medium" | "high";
     details: string | null;
   };
+  sourcesChecked: { name: string; type: string; url: string; result: string }[];
   overallRisk: "none" | "low" | "medium" | "high" | "critical";
   summary: string;
   recommendations: string[];
@@ -597,6 +598,14 @@ Effectue ces 4 analyses et réponds UNIQUEMENT en JSON :
     "riskLevel": "low|medium|high",
     "details": "Détails sur le statut GAFI du pays si pertinent"
   },
+  "sourcesChecked": [
+    {
+      "name": "Nom de la base/source",
+      "type": "pep_database|sanctions_list|media|registry|fatf|other",
+      "url": "URL de la source",
+      "result": "Description du résultat (match trouvé / aucun match / non accessible)"
+    }
+  ],
   "overallRisk": "none|low|medium|high|critical",
   "summary": "Résumé en 2-3 phrases de l'analyse complète, en français",
   "recommendations": [
@@ -622,7 +631,44 @@ RÈGLES :
 
 6. RECOMMENDATIONS : Toujours donner des actions concrètes (ex: "Appliquer une vigilance renforcée", "Vérifier l'origine des fonds", "Obtenir l'approbation de la hiérarchie").
 
-7. Si tu n'as aucune information fiable, dis-le clairement dans le summary et mets confidence bas. Ne PAS inventer de résultats.`,
+7. Si tu n'as aucune information fiable, dis-le clairement dans le summary et mets confidence bas. Ne PAS inventer de résultats.
+
+8. SOURCES VÉRIFIÉES (sourcesChecked) — TOUJOURS remplir cette liste, même si aucun match n'est trouvé.
+   Liste TOUTES les bases de données et sources que tu as consultées/que tu connais, avec leur URL :
+
+   Bases PEP :
+   - {"name": "Liste PEP Monaco (AMSF)", "type": "pep_database", "url": "https://siccfin.mc", "result": "..."}
+   - {"name": "Registre PEP France (HATVP)", "type": "pep_database", "url": "https://www.hatvp.fr/consulter-les-declarations/", "result": "..."}
+   - {"name": "CIA World Leaders", "type": "pep_database", "url": "https://www.cia.gov/resources/world-leaders/", "result": "..."}
+   - {"name": "Every Politician", "type": "pep_database", "url": "https://everypolitician.org", "result": "..."}
+
+   Listes de sanctions :
+   - {"name": "Liste consolidée ONU", "type": "sanctions_list", "url": "https://www.un.org/securitycouncil/content/un-sc-consolidated-list", "result": "..."}
+   - {"name": "Liste consolidée UE", "type": "sanctions_list", "url": "https://www.sanctionsmap.eu", "result": "..."}
+   - {"name": "OFAC SDN List (US)", "type": "sanctions_list", "url": "https://sanctionssearch.ofac.treas.gov/", "result": "..."}
+   - {"name": "UK HMT Sanctions", "type": "sanctions_list", "url": "https://www.gov.uk/government/publications/the-uk-sanctions-list", "result": "..."}
+   - {"name": "Gel des fonds Monaco", "type": "sanctions_list", "url": "https://service-public-entreprises.gouv.mc/En-cours-d-activite/Obligations-legales-et-comptables/Mesures-de-gel-de-fonds", "result": "..."}
+
+   Registres :
+   - {"name": "RCI Monaco", "type": "registry", "url": "https://rci.gouv.mc", "result": "..."}
+   - {"name": "Registre Bénéficiaires Effectifs Monaco", "type": "registry", "url": "https://rbe.gouv.mc", "result": "..."}
+   - {"name": "Companies House UK", "type": "registry", "url": "https://find-and-update.company-information.service.gov.uk/", "result": "..."}
+   - {"name": "Infogreffe France", "type": "registry", "url": "https://www.infogreffe.fr", "result": "..."}
+   - {"name": "OpenCorporates", "type": "registry", "url": "https://opencorporates.com", "result": "..."}
+
+   GAFI/FATF :
+   - {"name": "GAFI Juridictions à haut risque", "type": "fatf", "url": "https://www.fatf-gafi.org/fr/pays/#high-risk", "result": "..."}
+   - {"name": "GAFI Juridictions sous surveillance", "type": "fatf", "url": "https://www.fatf-gafi.org/fr/pays/#increased-monitoring", "result": "..."}
+
+   Médias :
+   - {"name": "Google News", "type": "media", "url": "https://news.google.com", "result": "..."}
+   - {"name": "Reuters", "type": "media", "url": "https://www.reuters.com", "result": "..."}
+   - {"name": "OCCRP (crime organisé)", "type": "media", "url": "https://www.occrp.org", "result": "..."}
+   - {"name": "ICIJ (Panama/Pandora Papers)", "type": "media", "url": "https://offshoreleaks.icij.org", "result": "..."}
+   - {"name": "Transparency International", "type": "media", "url": "https://www.transparency.org", "result": "..."}
+
+   Pour chaque source, indique le résultat : "Aucun match trouvé", "Match trouvé — [détails]", "Base non accessible (vérification manuelle recommandée)", etc.
+   Tu DOIS lister AU MINIMUM 10 sources dans sourcesChecked.`,
     `Screening complet de : ${params.name}. Analyse PEP, sanctions, adverse media et risque pays.`,
   );
 
@@ -634,6 +680,7 @@ RÈGLES :
       sanctions: { match: false, risk: "none", lists: [], details: null, sources: [] },
       adverseMedia: { match: false, articles: [] },
       countryRisk: { country: params.nationality ?? params.jurisdiction ?? "??", gafiFatfStatus: "none", riskLevel: "low", details: null },
+      sourcesChecked: [],
       overallRisk: "none",
       summary: "Le screening n'a pas pu être complété. Vérification manuelle requise.",
       recommendations: ["Effectuer un screening manuel via World-Check ou équivalent"],
