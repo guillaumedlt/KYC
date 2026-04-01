@@ -157,28 +157,44 @@ export async function extractIdentity(imageBase64: string, mediaType?: string): 
   documentNumber: string | null;
   documentExpiry: string | null;
   documentType: string | null;
-  countryOfResidence: string | null;
+  placeOfBirth: string | null;
+  gender: string | null;
   confidence: number;
   warnings: string[];
 }> {
   const result = await callClaude(
     "extract",
     `Tu extrais les informations d'un document d'identité (passeport, CNI, titre de séjour).
-Réponds UNIQUEMENT en JSON avec ces champs:
+
+RÈGLES IMPORTANTES :
+- firstName : TOUS les prénoms tels qu'ils apparaissent sur le document, séparés par des espaces. Par exemple "Jean Pierre Marie" si 3 prénoms. Ne jamais tronquer.
+- lastName : Le nom de famille complet tel qu'il apparaît sur le document.
+- documentExpiry : La date d'expiration COMPLÈTE au format JJ/MM/AAAA. Si seuls le mois et l'année sont visibles, mettre "01/MM/AAAA". Si la date est passée, ajouter un warning.
+- dateOfBirth : Format JJ/MM/AAAA.
+- nationality : Code ISO 2 lettres (FR, MC, IT, GB, US, etc.). Déduis-le du pays émetteur si non explicite.
+- Ne PAS inventer de données. Si un champ n'est pas lisible, mets null.
+
+Réponds UNIQUEMENT en JSON :
 {
-  "firstName": "...",
-  "lastName": "...",
+  "firstName": "TOUS les prénoms séparés par des espaces",
+  "lastName": "NOM DE FAMILLE",
   "dateOfBirth": "JJ/MM/AAAA",
   "nationality": "CODE ISO 2 lettres",
-  "documentNumber": "...",
-  "documentExpiry": "MM/AAAA",
+  "documentNumber": "numéro du document",
+  "documentExpiry": "JJ/MM/AAAA",
   "documentType": "passport|national_id|residence_permit",
-  "countryOfResidence": "CODE ISO 2 lettres ou null",
+  "placeOfBirth": "ville ou lieu de naissance si visible",
+  "gender": "M|F ou null",
   "confidence": 0-100,
   "warnings": ["liste de problèmes détectés"]
 }
-Si un champ n'est pas lisible, mets null. Ajoute un warning si le document expire dans moins de 3 mois.`,
-    "Extrais toutes les informations de ce document d'identité.",
+
+Warnings à ajouter automatiquement :
+- Si le document est expiré : "Document expiré depuis le JJ/MM/AAAA"
+- Si le document expire dans moins de 3 mois : "Document expire bientôt (JJ/MM/AAAA)"
+- Si la photo est floue ou illisible : "Photo ou document de mauvaise qualité"
+- Si le MRZ est incohérent avec les champs : "Incohérence MRZ détectée"`,
+    "Extrais toutes les informations de ce document d'identité. Prends TOUS les prénoms.",
     imageBase64,
     mediaType,
   );
@@ -186,7 +202,7 @@ Si un champ n'est pas lisible, mets null. Ajoute un warning si le document expir
   try {
     return JSON.parse(result.text);
   } catch {
-    return { firstName: null, lastName: null, dateOfBirth: null, nationality: null, documentNumber: null, documentExpiry: null, documentType: null, countryOfResidence: null, confidence: 0, warnings: ["Extraction échouée"] };
+    return { firstName: null, lastName: null, dateOfBirth: null, nationality: null, documentNumber: null, documentExpiry: null, documentType: null, placeOfBirth: null, gender: null, confidence: 0, warnings: ["Extraction échouée"] };
   }
 }
 

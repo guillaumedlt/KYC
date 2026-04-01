@@ -71,7 +71,6 @@ export function PersonIdentityStep({
       if (result && result.confidence > 0) {
         update({
           nationality: result.nationality ?? "",
-          residence: result.countryOfResidence ?? result.nationality ?? "",
           firstName: result.firstName ?? "",
           lastName: result.lastName ?? "",
           dateOfBirth: result.dateOfBirth ?? "",
@@ -81,10 +80,10 @@ export function PersonIdentityStep({
           aiExtractions: {
             ...data.aiExtractions,
             identity_confidence: String(result.confidence),
-            mrz_valid: "true",
             doc_type_detected: result.documentType ?? "unknown",
             nationality_detected: result.nationality ?? "",
-            residence_detected: result.countryOfResidence ?? "",
+            place_of_birth: result.placeOfBirth ?? "",
+            gender: result.gender ?? "",
           },
           aiWarnings: result.warnings ?? [],
         });
@@ -214,13 +213,18 @@ export function PersonIdentityStep({
           </div>
 
           <div className="divide-y divide-border/50">
-            <FieldRow label="Prénom" value={data.firstName} editing={editMode} onEdit={(v) => update({ firstName: v })} />
+            <FieldRow label="Prénom(s)" value={data.firstName} editing={editMode} onEdit={(v) => update({ firstName: v })} />
             <FieldRow label="Nom" value={data.lastName} editing={editMode} onEdit={(v) => update({ lastName: v })} />
             <FieldRow label="Date de naissance" value={data.dateOfBirth} mono editing={editMode} onEdit={(v) => update({ dateOfBirth: v })} />
+            {data.aiExtractions.place_of_birth && (
+              <FieldRow label="Lieu de naissance" value={data.aiExtractions.place_of_birth} editing={false} />
+            )}
             <FieldRow label="Nationalité" value={data.nationality ? (FLAGS[data.nationality] ?? data.nationality) : ""} editing={editMode} onEdit={(v) => update({ nationality: v })} editValue={data.nationality} />
-            <FieldRow label="Résidence" value={data.residence ? (FLAGS[data.residence] ?? data.residence) : ""} editing={editMode} onEdit={(v) => update({ residence: v })} editValue={data.residence} />
+            {data.aiExtractions.gender && (
+              <FieldRow label="Sexe" value={data.aiExtractions.gender === "M" ? "Masculin" : data.aiExtractions.gender === "F" ? "Féminin" : data.aiExtractions.gender} editing={false} />
+            )}
             <FieldRow label="N° document" value={data.documentNumber} mono editing={editMode} onEdit={(v) => update({ documentNumber: v })} />
-            <FieldRow label="Expiration" value={data.documentExpiry} mono editing={editMode} onEdit={(v) => update({ documentExpiry: v })} />
+            <FieldRow label="Date d'expiration" value={data.documentExpiry} mono editing={editMode} onEdit={(v) => update({ documentExpiry: v })} />
           </div>
 
           {data.aiExtractions.identity_confidence && data.aiExtractions.identity_confidence !== "0" && (
