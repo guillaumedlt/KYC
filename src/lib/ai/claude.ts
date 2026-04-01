@@ -505,57 +505,106 @@ NOTE: Tu n'as pas accès aux bases de données PEP/sanctions en temps réel. Bas
 }
 
 // =============================================================================
-// FUNDS SOURCE EXTRACTION — Sonnet
+// FUNDS SOURCE EXTRACTION — Opus (critical compliance check)
 // =============================================================================
 
-export async function extractFundsSource(imageBase64: string, mediaType?: string, clientContext?: { firstName?: string; lastName?: string; nationality?: string }): Promise<{
+export async function extractFundsSource(imageBase64: string, mediaType?: string, clientContext?: {
+  firstName?: string;
+  lastName?: string;
+  nationality?: string;
+  dateOfBirth?: string;
+  address?: string;
+  documentNumber?: string;
+}): Promise<{
   sourceType: string;
   amount: string | null;
+  currency: string | null;
   employer: string | null;
   period: string | null;
+  documentDate: string | null;
   nameOnDocument: string | null;
+  addressOnDocument: string | null;
   nameMatch: boolean;
+  isValidFundsDoc: boolean;
+  coherenceScore: number;
   confidence: number;
   warnings: string[];
+  checks: { check: string; result: "pass" | "fail" | "warning" | "na"; detail: string }[];
 }> {
-  const clientInfo = clientContext
-    ? `\n\nCONTEXTE CLIENT (identité déjà vérifiée) :\n- Nom: ${clientContext.lastName ?? "inconnu"}\n- Prénom(s): ${clientContext.firstName ?? "inconnu"}\n- Nationalité: ${clientContext.nationality ?? "inconnue"}\n\nVÉRIFICATION OBLIGATOIRE :\n1. Vérifie que le nom sur ce document correspond au client. Si non → nameMatch = false + warning.\n2. Vérifie que ce document est bien un justificatif de source de fonds (pas un document sans rapport).\n3. Vérifie la cohérence entre le montant et le type de source déclaré.`
-    : "";
+  const ctx = clientContext ?? {};
+  const clientBlock = `
+DOSSIER CLIENT (données déjà vérifiées par extraction d'identité) :
+- Nom complet : ${ctx.lastName ?? "INCONNU"} ${ctx.firstName ?? ""}
+- Date de naissance : ${ctx.dateOfBirth ?? "non renseignée"}
+- Nationalité : ${ctx.nationality ?? "non renseignée"}
+- Adresse : ${ctx.address ?? "non renseignée"}
+- N° document d'identité : ${ctx.documentNumber ?? "non renseigné"}`;
 
   const result = await callClaude(
     "extract",
-    `Tu extrais les informations d'un justificatif de source de fonds ET tu vérifies la cohérence avec l'identité du client.${clientInfo}
+    `Tu es un analyste compliance senior. Tu vérifies un justificatif de source de fonds dans le cadre d'un KYC.
 
-Types de source :
-- salary : Fiche de paie, bulletin de salaire, attestation employeur
-- real_estate : Acte de vente immobilière, attestation notaire
-- inheritance : Acte de succession, certificat d'héritage, donation
-- investment : Relevé de portefeuille, avis d'opéré, plus-value
-- business : Bilan, liasse fiscale, revenus d'activité
-- pension : Pension de retraite, rente
-- rental_income : Revenus locatifs, quittances
-- insurance : Rachat d'assurance-vie, indemnité
-- loan : Contrat de prêt
-- other : Autre source
+${clientBlock}
 
-Réponds UNIQUEMENT en JSON:
+MISSION : Analyse ce document et effectue TOUTES les vérifications ci-dessous.
+
+Réponds UNIQUEMENT en JSON :
 {
-  "sourceType": "salary|real_estate|inheritance|investment|business|pension|rental_income|insurance|loan|other",
-  "amount": "montant avec devise (ex: 4 500 EUR)",
-  "employer": "nom de l'employeur, du notaire, de la banque, ou de la source",
-  "period": "période couverte (ex: Mars 2026, Année 2025, etc.)",
-  "nameOnDocument": "nom de la personne tel qu'il apparaît sur le document",
-  "nameMatch": true si le nom correspond au client,
+  "sourceType": "salary|real_estate|inheritance|investment|business|pension|rental_income|insurance|gift|loan|savings|other",
+  "amount": "montant principal avec devise (ex: 4 500 EUR)",
+  "currency": "EUR|USD|GBP|CHF|...",
+  "employer": "employeur, notaire, banque, source...",
+  "period": "période couverte",
+  "documentDate": "JJ/MM/AAAA du document",
+  "nameOnDocument": "nom EXACT tel qu'il apparaît",
+  "addressOnDocument": "adresse si visible sur le document",
+  "nameMatch": true/false,
+  "isValidFundsDoc": true/false,
+  "coherenceScore": 0-100,
   "confidence": 0-100,
-  "warnings": ["liste de problèmes"]
+  "warnings": [],
+  "checks": [
+    {"check": "nom_correspondance", "result": "pass|fail|warning|na", "detail": "..."},
+    {"check": "type_document_valide", "result": "pass|fail|warning|na", "detail": "..."},
+    {"check": "date_document", "result": "pass|fail|warning|na", "detail": "..."},
+    {"check": "montant_coherent", "result": "pass|fail|warning|na", "detail": "..."},
+    {"check": "adresse_coherente", "result": "pass|fail|warning|na", "detail": "..."},
+    {"check": "coherence_globale", "result": "pass|fail|warning|na", "detail": "..."}
+  ]
 }
 
-Warnings automatiques :
-- Nom différent : "Le nom sur le document (XXX) ne correspond pas au client (YYY)"
-- Document sans rapport : "Ce document ne semble pas être un justificatif de source de fonds"
-- Montant incohérent : "Montant inhabituellement élevé/faible pour ce type de source"
-- Document ancien : "Document daté de plus de 12 mois"`,
-    "Extrais les informations de source de fonds. Vérifie que le nom correspond au client.",
+VÉRIFICATIONS OBLIGATOIRES (checks) :
+
+1. NOM_CORRESPONDANCE : Le nom sur le document correspond-il au client ?
+   - Comparer nom de famille (les prénoms peuvent différer entre docs)
+   - Tolérer les variantes mineures (accent, tiret, initiales)
+   - FAIL si le document est au nom d'une autre personne
+   - WARNING si le nom est similaire mais pas identique
+
+2. TYPE_DOCUMENT_VALIDE : Ce document est-il un vrai justificatif de source de fonds ?
+   Documents acceptés : fiche de paie, attestation employeur, avis d'imposition, acte notarié, relevé bancaire avec provenance identifiable, certificat de succession, contrat de vente, relevé de portefeuille
+   Documents REFUSÉS : photo perso, document d'identité, ticket de caisse, capture d'écran non officielle, document non signé/non tamponné
+   - FAIL si ce n'est pas un justificatif de fonds
+
+3. DATE_DOCUMENT : Le document est-il récent ?
+   - PASS si < 6 mois
+   - WARNING si 6-12 mois
+   - FAIL si > 12 mois ou date illisible
+
+4. MONTANT_COHERENT : Le montant est-il plausible ?
+   - Salaire mensuel > 50 000 EUR → WARNING "Salaire inhabituellement élevé"
+   - Vente immobilière sans détail du bien → WARNING
+   - Montant = 0 ou négatif → FAIL
+
+5. ADRESSE_COHERENTE : Si une adresse est visible sur le document, correspond-elle à l'adresse du client ?
+   - NA si pas d'adresse sur le document
+   - PASS/FAIL sinon
+
+6. COHERENCE_GLOBALE : Vue d'ensemble — le document est-il crédible et cohérent avec le profil du client ?
+   - Un salaire de 50K/mois pour un retraité → FAIL
+   - Un héritage de 10M pour un étudiant → WARNING
+   - Tout semble normal → PASS`,
+    "Analyse ce justificatif de source de fonds. Effectue TOUTES les vérifications de cohérence avec le dossier client. Sois rigoureux.",
     imageBase64,
     mediaType,
   );
@@ -563,6 +612,12 @@ Warnings automatiques :
   try {
     return JSON.parse(result.text);
   } catch {
-    return { sourceType: "other", amount: null, employer: null, period: null, nameOnDocument: null, nameMatch: true, confidence: 0, warnings: ["Extraction échouée"] };
+    return {
+      sourceType: "other", amount: null, currency: null, employer: null, period: null,
+      documentDate: null, nameOnDocument: null, addressOnDocument: null,
+      nameMatch: true, isValidFundsDoc: false, coherenceScore: 0, confidence: 0,
+      warnings: ["Extraction échouée"],
+      checks: [{ check: "coherence_globale", result: "fail", detail: "Le document n'a pas pu être analysé" }],
+    };
   }
 }

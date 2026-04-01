@@ -75,7 +75,14 @@ export function PersonFundsStep({ data, update, next, back }: {
       const extractPromise = fetch("/api/ai-extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "funds", base64, mediaType, clientContext: { firstName: data.firstName, lastName: data.lastName, nationality: data.nationality } }),
+        body: JSON.stringify({ action: "funds", base64, mediaType, clientContext: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          nationality: data.nationality,
+          dateOfBirth: data.dateOfBirth,
+          address: data.addressExtracted,
+          documentNumber: data.documentNumber,
+        } }),
       }).then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -84,8 +91,11 @@ export function PersonFundsStep({ data, update, next, back }: {
 
       if (result && result.confidence > 0) {
         const warnings = result.warnings ?? [];
-        if (result.nameMatch === false) {
-          warnings.push(`Nom sur le document (${result.nameOnDocument ?? "?"}) ≠ client (${data.lastName})`);
+        // Add failed checks as warnings
+        const checks = (result.checks ?? []) as { check: string; result: string; detail: string }[];
+        for (const c of checks) {
+          if (c.result === "fail") warnings.push(`❌ ${c.detail}`);
+          else if (c.result === "warning") warnings.push(`⚠️ ${c.detail}`);
         }
         update({
           fundsSource: result.sourceType ?? "other",
@@ -93,11 +103,16 @@ export function PersonFundsStep({ data, update, next, back }: {
           aiExtractions: {
             ...data.aiExtractions,
             funds_confidence: String(result.confidence),
+            funds_coherence_score: String(result.coherenceScore ?? 0),
             funds_type_detected: result.sourceType ?? "",
             funds_employer: result.employer ?? "",
             funds_period: result.period ?? "",
+            funds_currency: result.currency ?? "",
+            funds_document_date: result.documentDate ?? "",
             funds_name_match: result.nameMatch ? "true" : "false",
             funds_name_on_doc: result.nameOnDocument ?? "",
+            funds_valid_doc: result.isValidFundsDoc ? "true" : "false",
+            funds_checks: JSON.stringify(checks),
           },
           aiWarnings: [...(data.aiWarnings || []), ...warnings],
         });
