@@ -7,7 +7,6 @@ import { TypeStep } from "./steps/type-step";
 import { PersonIdentityStep } from "./steps/person-identity";
 import { PersonAddressStep } from "./steps/person-address";
 import { PersonFundsStep } from "./steps/person-funds";
-import { CompanyInfoStep } from "./steps/company-info";
 import { CompanyDocsStep } from "./steps/company-docs";
 import { CompanyUboStep } from "./steps/company-ubo";
 import { ReviewStep } from "./steps/review";
@@ -68,7 +67,7 @@ const INITIAL_DATA: WizardData = {
 };
 
 const PERSON_STEPS = ["Type", "Identité", "Adresse", "Fonds", "Revue"];
-const COMPANY_STEPS = ["Type", "Société", "Documents", "UBO", "Revue"];
+const COMPANY_STEPS = ["Type", "Documents", "UBO", "Revue"];
 
 export function KycWizard() {
   const [step, setStep] = useState(0);
@@ -123,9 +122,8 @@ export function KycWizard() {
       {data.kind === "person" && step === 2 && <PersonAddressStep data={data} update={update} next={next} back={back} />}
       {data.kind === "person" && step === 3 && <PersonFundsStep data={data} update={update} next={next} back={back} />}
 
-      {(data.kind === "company" || data.kind === "structure") && step === 1 && <CompanyInfoStep data={data} update={update} next={next} back={back} />}
-      {(data.kind === "company" || data.kind === "structure") && step === 2 && <CompanyDocsStep data={data} update={update} next={next} back={back} />}
-      {(data.kind === "company" || data.kind === "structure") && step === 3 && <CompanyUboStep data={data} update={update} next={next} back={back} />}
+      {(data.kind === "company" || data.kind === "structure") && step === 1 && <CompanyDocsStep data={data} update={update} next={next} back={back} />}
+      {(data.kind === "company" || data.kind === "structure") && step === 2 && <CompanyUboStep data={data} update={update} next={next} back={back} />}
 
       {step === steps.length - 1 && step > 0 && <ReviewStep data={data} back={back} />}
     </div>
