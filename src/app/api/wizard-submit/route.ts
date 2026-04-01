@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     const caseNumber = `KYC-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
     const vigilance = (data.riskScore ?? 0) >= 60 ? "enhanced" : (data.riskScore ?? 0) >= 26 ? "standard" : "simplified";
 
-    await supabase.from("kyc_cases").insert({
+    const { data: kycCase } = await supabase.from("kyc_cases").insert({
       tenant_id: TENANT_ID,
       entity_id: entityId,
       case_number: caseNumber,
@@ -167,7 +167,9 @@ export async function POST(request: NextRequest) {
       status: "screening",
       created_by: userId,
       due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-    });
+    }).select("id").single();
+
+    const caseId = kycCase?.id ?? null;
 
     // 5. Create UBO relations
     if (!isPerson && data.ubos && data.ubos.length > 0) {
@@ -213,7 +215,7 @@ export async function POST(request: NextRequest) {
     revalidatePath("/cases");
     revalidatePath("/documents");
 
-    return NextResponse.json({ entityId });
+    return NextResponse.json({ entityId, caseId });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[Wizard Submit] FAILED:", msg);

@@ -94,7 +94,7 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
         throw new Error(resData.error || `Erreur création entité (HTTP ${res.status})`);
       }
 
-      const { entityId } = resData;
+      const { entityId, caseId } = resData;
 
       // Step 2: Upload files ONE BY ONE (avoids body size limit)
       const allFiles: { file: File; docType: string }[] = [];
@@ -128,8 +128,9 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
         }
       }
 
-      setProgress("Redirection...");
-      router.push(`/entities/${entityId}`);
+      setProgress("Redirection vers le dossier...");
+      // Redirect to dossier (case) if available, otherwise entity
+      router.push(caseId ? `/cases/${caseId}` : `/entities/${entityId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de la soumission. Réessayez.");
       setSubmitting(false);

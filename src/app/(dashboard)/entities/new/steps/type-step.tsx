@@ -24,9 +24,9 @@ export function TypeStep({
 
   return (
     <div>
-      <h2 className="mb-2 font-heading text-[18px] text-foreground">Vous êtes ?</h2>
+      <h2 className="mb-2 font-heading text-[18px] text-foreground">Type de dossier</h2>
       <p className="mb-6 text-[12px] text-muted-foreground">
-        Ce choix détermine les documents requis et le parcours de vérification.
+        Choisissez le type de client. Ce choix détermine les documents requis et le parcours de vérification.
       </p>
 
       <div className="space-y-3">

@@ -87,12 +87,12 @@ export function KycWizard() {
   return (
     <div className="mx-auto max-w-2xl">
       {/* Back */}
-      <Link href="/entities" className="mb-4 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-3 w-3" /> Entités
+      <Link href="/cases" className="mb-4 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-3 w-3" /> Dossiers KYC
       </Link>
 
       {/* Title */}
-      <h1 className="mb-1 font-heading text-[22px] text-foreground">Nouvelle vérification KYC</h1>
+      <h1 className="mb-1 font-heading text-[22px] text-foreground">Nouveau dossier KYC</h1>
       <p className="mb-6 text-[12px] text-muted-foreground">Parcours guidé — l&apos;IA extrait et vérifie automatiquement</p>
 
       {/* Progress */}

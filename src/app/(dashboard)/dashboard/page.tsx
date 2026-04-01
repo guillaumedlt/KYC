@@ -65,8 +65,8 @@ export default async function DashboardPage() {
             {openCases.length > 0 && ` · ${openCases.length} dossier${openCases.length > 1 ? "s" : ""} en cours`}
           </p>
         </div>
-        <Link href="/entities/new" className="flex h-9 items-center gap-2 rounded-md bg-foreground px-4 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90">
-          <Plus className="h-3.5 w-3.5" /> Nouveau client
+        <Link href="/cases/new" className="flex h-9 items-center gap-2 rounded-md bg-foreground px-4 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90">
+          <Plus className="h-3.5 w-3.5" /> Nouveau dossier KYC
         </Link>
       </div>
 
@@ -156,8 +156,8 @@ export default async function DashboardPage() {
           <div className="rounded-md border border-border bg-card p-3">
             <span className="mb-2 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Actions rapides</span>
             <div className="space-y-1">
-              <Link href="/entities/new" className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] text-foreground transition-colors hover:bg-muted/30">
-                <Plus className="h-3 w-3 text-muted-foreground" /> Nouveau client
+              <Link href="/cases/new" className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] text-foreground transition-colors hover:bg-muted/30">
+                <Plus className="h-3 w-3 text-muted-foreground" /> Nouveau dossier KYC
               </Link>
               <Link href="/screening" className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] text-foreground transition-colors hover:bg-muted/30">
                 <FolderOpen className="h-3 w-3 text-muted-foreground" /> Screening en attente
