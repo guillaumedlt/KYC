@@ -32,8 +32,8 @@ type TaskType =
   | "complex_analysis"; // Opus — complex multi-step analysis
 
 const MODEL_MAP: Record<TaskType, string> = {
-  classify: "claude-haiku-4-5-20251001",
-  extract: "claude-sonnet-4-20250514",
+  classify: "claude-sonnet-4-20250514",   // Sonnet for vision-based classification (reads the doc)
+  extract: "claude-opus-4-20250514",      // Opus for best OCR accuracy on identity docs
   screen: "claude-haiku-4-5-20251001",
   risk_assess: "claude-sonnet-4-20250514",
   summarize: "claude-haiku-4-5-20251001",
@@ -128,20 +128,70 @@ function extractJson(text: string): string {
 // DOCUMENT CLASSIFICATION — Haiku (cheapest)
 // =============================================================================
 
-export async function classifyDocument(fileName: string, textContent?: string): Promise<{
-  type: "passport" | "national_id" | "proof_of_address" | "company_registration" | "articles_of_association" | "bank_statement" | "financial_statement" | "other";
+export async function classifyDocument(fileName: string, textContent?: string, imageBase64?: string, mediaType?: string): Promise<{
+  type: string;
+  label: string;
   confidence: number;
 }> {
+  const systemPrompt = `Tu analyses des documents pour les classifier précisément dans le cadre d'un processus KYC/AML.
+
+Analyse le CONTENU du document (pas seulement le nom de fichier). Identifie exactement ce que c'est.
+
+Réponds UNIQUEMENT en JSON :
+{
+  "type": "code_technique",
+  "label": "Description lisible en français",
+  "confidence": 0-100
+}
+
+Types possibles et leurs labels :
+- "passport" → "Passeport"
+- "national_id" → "Carte nationale d'identité"
+- "residence_permit" → "Titre de séjour"
+- "driving_license" → "Permis de conduire"
+- "proof_of_address_electricity" → "Facture d'électricité"
+- "proof_of_address_water" → "Facture d'eau"
+- "proof_of_address_gas" → "Facture de gaz"
+- "proof_of_address_telecom" → "Facture téléphone/internet"
+- "proof_of_address_insurance" → "Attestation d'assurance habitation"
+- "proof_of_address_tax" → "Avis d'imposition"
+- "proof_of_address_rent" → "Quittance de loyer"
+- "proof_of_address_bank" → "Relevé bancaire (justificatif domicile)"
+- "proof_of_address_certificate" → "Attestation de résidence"
+- "proof_of_address_other" → "Justificatif de domicile (autre)"
+- "company_registration" → "Extrait RCI / Kbis / Certificate of incorporation"
+- "articles_of_association" → "Statuts de société"
+- "shareholder_register" → "Registre des actionnaires"
+- "board_minutes" → "PV d'assemblée / Conseil d'administration"
+- "power_of_attorney" → "Procuration / Pouvoir"
+- "bank_statement" → "Relevé bancaire"
+- "financial_statement" → "Bilan comptable / États financiers"
+- "payslip" → "Fiche de paie / Bulletin de salaire"
+- "tax_return" → "Déclaration fiscale"
+- "sale_deed" → "Acte de vente"
+- "inheritance_certificate" → "Certificat de succession / Acte notarié"
+- "business_plan" → "Business plan"
+- "invoice" → "Facture"
+- "contract" → "Contrat"
+- "certificate" → "Certificat / Attestation"
+- "letter" → "Courrier / Lettre"
+- "photo" → "Photo d'identité / Selfie"
+- "other" → "Autre document"
+
+Choisis le type le PLUS PRÉCIS possible. Par exemple, ne mets pas "proof_of_address" générique si tu peux identifier que c'est une facture EDF → "proof_of_address_electricity".`;
+
   const result = await callClaude(
     "classify",
-    "Tu classifies des documents KYC. Réponds UNIQUEMENT en JSON: {\"type\": \"...\", \"confidence\": 0-100}. Types possibles: passport, national_id, proof_of_address, company_registration, articles_of_association, bank_statement, financial_statement, other.",
-    `Fichier: "${fileName}"${textContent ? `\nContenu (extrait): ${textContent.slice(0, 500)}` : ""}`,
+    systemPrompt,
+    `Nom du fichier: "${fileName}"${textContent ? `\nContenu textuel (extrait): ${textContent.slice(0, 500)}` : ""}\n\nAnalyse le contenu visuel du document et classifie-le précisément.`,
+    imageBase64,
+    mediaType,
   );
 
   try {
     return JSON.parse(result.text);
   } catch {
-    return { type: "other", confidence: 0 };
+    return { type: "other", label: "Autre document", confidence: 0 };
   }
 }
 

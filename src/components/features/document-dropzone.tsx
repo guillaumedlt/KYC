@@ -6,8 +6,9 @@ import { cn } from "@/lib/utils";
 
 interface UploadedFile {
   file: File;
-  status: "uploading" | "extracting" | "done" | "error";
+  status: "uploading" | "classifying" | "extracting" | "done" | "error";
   details?: string;
+  docLabel?: string;
 }
 
 interface DocumentDropzoneProps {
@@ -63,12 +64,35 @@ export function DocumentDropzone({
   const processFile = useCallback(async (file: File) => {
     if (file.size > 20 * 1024 * 1024) return;
 
-    const entry: UploadedFile = { file, status: aiExtract ? "extracting" : "uploading" };
+    const entry: UploadedFile = { file, status: "classifying" };
     setFiles((prev) => [...prev, entry]);
 
     try {
       const base64 = await fileToBase64(file);
 
+      // Step 1: Classify the document (analyze content, not just filename)
+      let docLabel = file.name;
+      try {
+        const classifyRes = await fetch("/api/ai-extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "classify", base64, mediaType: file.type, fileName: file.name }),
+        });
+        if (classifyRes.ok) {
+          const classification = await classifyRes.json();
+          if (classification?.label) {
+            docLabel = classification.label;
+          }
+        }
+      } catch {
+        // Classification failed — continue with extraction anyway
+      }
+
+      setFiles((prev) => prev.map((f) =>
+        f.file === file ? { ...f, status: aiExtract ? "extracting" : "done", docLabel } : f
+      ));
+
+      // Step 2: Extract if needed
       if (aiExtract) {
         const res = await fetch("/api/ai-extract", {
           method: "POST",
@@ -80,16 +104,16 @@ export function DocumentDropzone({
 
         setFiles((prev) => prev.map((f) =>
           f.file === file
-            ? { ...f, status: result?.confidence > 0 ? "done" : "error", details: result?.confidence ? `Confiance ${result.confidence}%` : "Extraction limitée" }
+            ? { ...f, status: result?.confidence > 0 ? "done" : "error", details: result?.confidence ? `Confiance ${result.confidence}%` : "Extraction limitée", docLabel }
             : f
         ));
 
-        onFilesProcessed?.([{ name: file.name, type: file.type, base64, extraction: result }]);
+        onFilesProcessed?.([{ name: file.name, type: file.type, base64, extraction: { ...result, docLabel } }]);
       } else {
         setFiles((prev) => prev.map((f) =>
-          f.file === file ? { ...f, status: "done" } : f
+          f.file === file ? { ...f, status: "done", docLabel } : f
         ));
-        onFilesProcessed?.([{ name: file.name, type: file.type, base64 }]);
+        onFilesProcessed?.([{ name: file.name, type: file.type, base64, extraction: { docLabel } }]);
       }
     } catch {
       setFiles((prev) => prev.map((f) =>
@@ -144,18 +168,29 @@ export function DocumentDropzone({
           {files.map((f, i) => (
             <div key={i} className="flex items-center justify-between px-3 py-2">
               <div className="flex items-center gap-2 min-w-0">
-                {f.status === "extracting" || f.status === "uploading" ? (
+                {f.status === "classifying" || f.status === "extracting" || f.status === "uploading" ? (
                   <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-foreground" />
                 ) : f.status === "done" ? (
                   <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                 ) : (
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                 )}
-                <span className="truncate text-[11px] text-foreground">{f.file.name}</span>
-                <span className="shrink-0 font-data text-[9px] text-muted-foreground">{(f.file.size / 1024).toFixed(0)} Ko</span>
-                {f.status === "extracting" && <span className="shrink-0 text-[9px] text-muted-foreground">Analyse IA...</span>}
-                {f.details && f.status !== "extracting" && (
-                  <span className={cn("shrink-0 text-[9px]", f.status === "done" ? "text-emerald-600" : "text-amber-600")}>{f.details}</span>
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[11px] text-foreground">{f.file.name}</span>
+                    <span className="shrink-0 font-data text-[9px] text-muted-foreground">{(f.file.size / 1024).toFixed(0)} Ko</span>
+                  </div>
+                  {f.docLabel && f.docLabel !== f.file.name && (
+                    <span className="text-[9px] font-medium text-foreground/70">{f.docLabel}</span>
+                  )}
+                </div>
+                {f.status === "classifying" && <span className="shrink-0 text-[9px] text-muted-foreground">Classification...</span>}
+                {f.status === "extracting" && <span className="shrink-0 text-[9px] text-muted-foreground">Extraction IA...</span>}
+                {f.details && f.status === "done" && (
+                  <span className="shrink-0 text-[9px] text-emerald-600">{f.details}</span>
+                )}
+                {f.details && f.status === "error" && (
+                  <span className="shrink-0 text-[9px] text-amber-600">{f.details}</span>
                 )}
               </div>
               <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}
