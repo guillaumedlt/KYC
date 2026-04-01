@@ -16,6 +16,7 @@ import {
   Pencil,
   X,
   Save,
+  Loader2,
 } from "lucide-react";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -120,7 +121,7 @@ export function EntityTabs(props: Props) {
       {tab === "info" && <InfoTab {...props} />}
       {tab === "documents" && <DocumentsTab documents={props.documents ?? []} entityId={props.entityId} />}
       {tab === "relations" && <RelationsTab {...props} />}
-      {tab === "screening" && <ScreeningTab screenings={props.screenings} />}
+      {tab === "screening" && <ScreeningTab screenings={props.screenings} entityId={props.entityId} entityName={(props.person?.last_name ? `${props.person.first_name} ${props.person.last_name}` : props.company?.legal_name ?? "") as string} entityType={props.entityType} nationality={(props.person?.nationality ?? props.company?.jurisdiction ?? null) as string | null} />}
       {tab === "cases" && <CasesTab cases={props.cases} />}
       {tab === "timeline" && <TimelineTab activities={props.activities} />}
     </div>
@@ -373,66 +374,148 @@ function RelationsTab({ relations, entityId, allEntities }: Props) {
 // SCREENING TAB
 // =============================================================================
 
-function ScreeningTab({ screenings }: { screenings: Screening[] }) {
-  if (screenings.length === 0) return <Empty text="Aucun screening effectué" sub="Lancez un screening PEP/sanctions via le bouton Screen" />;
+function ScreeningTab({ screenings, entityId, entityName, entityType, nationality }: {
+  screenings: Screening[]; entityId: string; entityName: string; entityType: string; nationality: string | null;
+}) {
+  const [running, setRunning] = useState(false);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+
+  async function launchScreening() {
+    setRunning(true);
+    setLastResult(null);
+    try {
+      const res = await fetch("/api/screening", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityId,
+          name: entityName,
+          type: entityType === "person" ? "person" : "company",
+          nationality,
+          jurisdiction: entityType !== "person" ? nationality : undefined,
+          screeningType: "all",
+        }),
+      });
+      if (!res.ok) throw new Error("Erreur");
+      const result = await res.json();
+      setLastResult(result.summary ?? "Screening terminé");
+      window.location.reload();
+    } catch {
+      setLastResult("Erreur lors du screening");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const TYPE_LABELS: Record<string, string> = {
+    pep: "PEP — Personnes Politiquement Exposées",
+    sanctions: "Sanctions internationales (ONU, UE, OFAC, UK HMT, Monaco)",
+    adverse_media: "Adverse Media — Médias défavorables",
+  };
+
   return (
-    <div className="space-y-2">
-      {screenings.map((s) => {
-        const match = s.matches[0] as Record<string, unknown> | undefined;
-        return (
-          <div key={s.id} className={cn(
-            "rounded-lg px-4 py-3",
-            s.match_found ? "bg-orange-50" : s.status === "processing" ? "bg-blue-50" : "bg-emerald-50",
-          )}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {s.match_found ? <AlertTriangle className="h-3.5 w-3.5 text-orange-600" /> :
-                 s.status === "processing" ? <Circle className="h-3.5 w-3.5 animate-pulse text-blue-600" /> :
-                 <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />}
-                <span className="text-[13px] font-medium">
-                  {s.screening_type === "pep" ? "PEP" : s.screening_type === "sanctions" ? "Sanctions" : "Adverse media"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-data text-[10px] text-muted-foreground">
-                  {s.lists_checked.map((l) => l.toUpperCase()).join(", ")}
-                </span>
-                <span className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                  s.match_found ? "bg-orange-100 text-orange-700" :
-                  s.status === "processing" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700",
-                )}>
-                  {s.match_found ? "Match" : s.status === "processing" ? "En cours" : "Clean"}
-                </span>
-              </div>
-            </div>
-            {match && s.match_found && (
-              <div className="mt-2 rounded-md bg-white/60 px-3 py-2">
-                <p className="text-[12px] text-foreground">{String(match.name ?? match.title ?? "")}</p>
-                {match.confidence != null && (
-                  <p className="mt-0.5 font-data text-[11px] text-muted-foreground">
-                    Confiance {String(match.confidence)}%
-                    {match.list != null ? ` · ${String(match.list)}` : ""}
-                    {match.source != null ? ` · ${String(match.source)}` : ""}
-                  </p>
+    <div className="space-y-4">
+      {/* Launch button */}
+      <div className="flex items-center justify-between rounded-md border border-border bg-card px-4 py-3">
+        <div>
+          <p className="text-[12px] font-medium text-foreground">Screening complet</p>
+          <p className="text-[10px] text-muted-foreground">PEP + Sanctions + Adverse Media + Risque Pays — Art. 6 Loi 1.362</p>
+        </div>
+        <Button size="sm" onClick={launchScreening} disabled={running} className="h-7 text-[10px]">
+          {running ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Search className="mr-1.5 h-3 w-3" />}
+          {running ? "Analyse en cours..." : "Lancer le screening"}
+        </Button>
+      </div>
+
+      {lastResult && (
+        <div className="rounded-md bg-muted/30 px-4 py-2 text-[11px] text-foreground">{lastResult}</div>
+      )}
+
+      {screenings.length === 0 ? (
+        <Empty text="Aucun screening effectué" sub="Cliquez sur 'Lancer le screening' pour analyser cette entité" />
+      ) : (
+        <div className="space-y-2">
+          {screenings.map((s) => {
+            const matches = (Array.isArray(s.matches) ? s.matches : []) as Record<string, unknown>[];
+            const firstMatch = matches[0];
+            return (
+              <div key={s.id} className={cn(
+                "rounded-md border px-4 py-3",
+                s.match_found ? "border-red-200 bg-red-50/50" : s.status === "processing" ? "border-blue-200 bg-blue-50/50" : "border-emerald-200 bg-emerald-50/50",
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {s.match_found ? <AlertTriangle className="h-3.5 w-3.5 text-red-600" /> :
+                     s.status === "processing" ? <Circle className="h-3.5 w-3.5 animate-pulse text-blue-600" /> :
+                     <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />}
+                    <span className="text-[12px] font-medium">
+                      {TYPE_LABELS[s.screening_type] ?? s.screening_type}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "rounded px-2 py-0.5 text-[10px] font-medium",
+                      s.match_found ? "bg-red-100 text-red-700" :
+                      s.status === "processing" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700",
+                    )}>
+                      {s.match_found ? "MATCH DÉTECTÉ" : s.status === "processing" ? "En cours" : "Aucun match"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Lists checked */}
+                {s.lists_checked.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {s.lists_checked.map((l) => (
+                      <span key={l} className="rounded bg-background px-1.5 py-0.5 font-data text-[9px] text-muted-foreground">{l.toUpperCase()}</span>
+                    ))}
+                  </div>
                 )}
+
+                {/* Match details */}
+                {s.match_found && matches.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {matches.map((m, mi) => (
+                      <div key={mi} className="rounded bg-white/80 px-3 py-2 border border-red-100">
+                        <p className="text-[11px] font-medium text-foreground">
+                          {String(m.name ?? m.title ?? m.function ?? "")}
+                        </p>
+                        {String(m.summary ?? "") !== "" && <p className="mt-0.5 text-[10px] text-muted-foreground">{String(m.summary)}</p>}
+                        <div className="mt-0.5 flex flex-wrap gap-1.5">
+                          {String(m.level ?? "") !== "" && <span className="text-[9px] text-red-600">Niveau : {String(m.level)}</span>}
+                          {String(m.country ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Pays : {String(m.country)}</span>}
+                          {String(m.list ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Liste : {String(m.list)}</span>}
+                          {String(m.source ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Source : {String(m.source)}</span>}
+                          {String(m.date ?? "") !== "" && <span className="font-data text-[9px] text-muted-foreground">{String(m.date)}</span>}
+                          {m.confidence != null && <span className="font-data text-[9px] text-muted-foreground">Confiance : {String(m.confidence)}%</span>}
+                          {m.relevance != null && <span className="font-data text-[9px] text-muted-foreground">Pertinence : {String(m.relevance)}%</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Review status */}
                 {s.review_decision && (
-                  <p className={cn("mt-1 text-[11px] font-medium",
-                    s.review_decision === "confirmed_match" ? "text-red-600" :
-                    s.review_decision === "false_positive" ? "text-emerald-600" : "text-amber-600",
-                  )}>
-                    {s.review_decision === "confirmed_match" ? "Match confirmé" :
-                     s.review_decision === "false_positive" ? "Faux positif" : "En attente de revue"}
-                  </p>
+                  <div className="mt-2">
+                    <span className={cn("rounded px-2 py-0.5 text-[10px] font-medium",
+                      s.review_decision === "confirmed_match" ? "bg-red-100 text-red-700" :
+                      s.review_decision === "false_positive" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700",
+                    )}>
+                      {s.review_decision === "confirmed_match" ? "Match confirmé" :
+                       s.review_decision === "false_positive" ? "Faux positif" : "En attente de revue"}
+                    </span>
+                  </div>
                 )}
+
+                <p className="mt-2 font-data text-[9px] text-muted-foreground">
+                  {new Date(s.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
               </div>
-            )}
-            <p className="mt-2 font-data text-[10px] text-muted-foreground">
-              {new Date(s.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-            </p>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

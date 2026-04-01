@@ -65,7 +65,14 @@ export default async function EntityDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
         </div>
-        <EntityActions entityId={id} entityName={entity.display_name} hasOpenCase={openCases.length > 0} />
+        <EntityActions
+          entityId={id}
+          entityName={entity.display_name}
+          entityType={entity.type as string}
+          nationality={(person as Record<string, unknown> | null)?.nationality as string ?? (company as Record<string, unknown> | null)?.jurisdiction as string ?? null}
+          dateOfBirth={(person as Record<string, unknown> | null)?.date_of_birth as string ?? null}
+          hasOpenCase={openCases.length > 0}
+        />
       </div>
 
       <div className="mb-3 flex gap-4 border-b border-border pb-3">
