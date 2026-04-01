@@ -78,6 +78,16 @@ export async function POST(request: NextRequest) {
     // Determine which screenings to save
     const screeningsToSave = [];
 
+    // Build full result payload for each screening type — includes sources, summary, etc.
+    const fullPayload = {
+      summary: result.summary,
+      recommendations: result.recommendations,
+      sourcesChecked: result.sourcesChecked,
+      countryRisk: result.countryRisk,
+      overallRisk: result.overallRisk,
+      confidence: result.confidence,
+    };
+
     // PEP screening
     if (screeningType === "all" || screeningType === "pep" || !screeningType) {
       screeningsToSave.push({
@@ -87,16 +97,19 @@ export async function POST(request: NextRequest) {
         lists_checked: ["pep_domestic", "pep_foreign", "pep_international"],
         status: "completed",
         match_found: result.pep.match,
-        matches: result.pep.match ? JSON.stringify([{
-          name: name,
-          function: result.pep.function,
-          level: result.pep.level,
-          country: result.pep.country,
-          since: result.pep.since,
-          until: result.pep.until,
-          familyLinks: result.pep.familyLinks,
-          confidence: result.confidence,
-        }]) : "[]",
+        matches: JSON.stringify({
+          details: result.pep.match ? [{
+            name,
+            function: result.pep.function,
+            level: result.pep.level,
+            country: result.pep.country,
+            since: result.pep.since,
+            until: result.pep.until,
+            familyLinks: result.pep.familyLinks,
+          }] : [],
+          sources: result.pep.sources,
+          ...fullPayload,
+        }),
         review_decision: null,
       });
     }
@@ -110,7 +123,12 @@ export async function POST(request: NextRequest) {
         lists_checked: ["un", "eu", "monaco", "ofac", "uk_hmt"],
         status: "completed",
         match_found: result.sanctions.match,
-        matches: result.sanctions.lists.length > 0 ? JSON.stringify(result.sanctions.lists) : "[]",
+        matches: JSON.stringify({
+          details: result.sanctions.lists,
+          sanctionDetails: result.sanctions.details,
+          sources: result.sanctions.sources,
+          ...fullPayload,
+        }),
         review_decision: null,
       });
     }
@@ -124,7 +142,10 @@ export async function POST(request: NextRequest) {
         lists_checked: [],
         status: "completed",
         match_found: result.adverseMedia.match,
-        matches: result.adverseMedia.articles.length > 0 ? JSON.stringify(result.adverseMedia.articles) : "[]",
+        matches: JSON.stringify({
+          details: result.adverseMedia.articles,
+          ...fullPayload,
+        }),
         review_decision: null,
       });
     }
@@ -171,6 +192,59 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[Screening] FAILED:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// PATCH — Manual review of a screening
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
+    const body = await request.json();
+    const { screeningId, decision } = body;
+
+    if (!screeningId || !decision) {
+      return NextResponse.json({ error: "Missing screeningId or decision" }, { status: 400 });
+    }
+
+    if (!["confirmed_match", "false_positive", "pending"].includes(decision)) {
+      return NextResponse.json({ error: "Invalid decision" }, { status: 400 });
+    }
+
+    // Get user ID from users table
+    const { data: existingUser } = await supabase.from("users").select("id").eq("id", user.id).single();
+    const userId = existingUser?.id ?? null;
+
+    const { error } = await supabase
+      .from("screenings")
+      .update({
+        review_decision: decision,
+        reviewed_by: userId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", screeningId);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Log activity
+    const { data: screening } = await supabase.from("screenings").select("*, entities(display_name)").eq("id", screeningId).single();
+    if (screening) {
+      await supabase.from("activities").insert({
+        tenant_id: TENANT_ID,
+        entity_id: screening.entity_id,
+        type: "screening_reviewed",
+        title: `Screening ${screening.screening_type} revu — ${decision === "confirmed_match" ? "Match confirmé" : decision === "false_positive" ? "Faux positif" : "En attente"}`,
+        description: `Revue manuelle par ${user.email} sur ${(screening.entities as Record<string, unknown>)?.display_name ?? screening.entity_id}`,
+        created_by: userId,
+      });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

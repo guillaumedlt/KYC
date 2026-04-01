@@ -187,11 +187,19 @@ export function ScreeningTab({ screenings, relations, entityId, entity }: Props)
                 {isExpanded && (
                   <div className="border-t border-border/50 divide-y divide-border/30">
                     {entityScreenings.map((s) => {
-                      const matches = (Array.isArray(s.matches) ? s.matches : (() => { try { return JSON.parse(s.matches as string); } catch { return []; } })()) as Record<string, unknown>[];
+                      // Parse the full payload from matches (new format has details, sources, summary)
+                      const rawMatches = (() => { try { return typeof s.matches === "string" ? JSON.parse(s.matches as string) : s.matches; } catch { return {}; } })() as Record<string, unknown>;
+                      const isNewFormat = rawMatches && !Array.isArray(rawMatches) && "sourcesChecked" in rawMatches;
+                      const matchDetails = isNewFormat ? (rawMatches.details as Record<string, unknown>[]) ?? [] : (Array.isArray(rawMatches) ? rawMatches : []) as Record<string, unknown>[];
+                      const storedSummary = isNewFormat ? String(rawMatches.summary ?? "") : "";
+                      const storedSources = isNewFormat ? (rawMatches.sourcesChecked as { name: string; type: string; url: string; result: string }[]) ?? [] : [];
+                      const storedRecommendations = isNewFormat ? (rawMatches.recommendations as string[]) ?? [] : [];
                       const hasMatch = s.match_found === true;
                       const TypeIcon = TYPE_ICONS[s.screening_type as string] ?? Search;
                       const screenKey = s.id as string;
                       const isScreenExpanded = expandedScreenings[screenKey] ?? hasMatch;
+                      const sourcesKey = `src-${screenKey}`;
+                      const isSourcesExpanded = expandedSources[sourcesKey] ?? false;
 
                       return (
                         <div key={s.id as string} className="px-3 py-2">
@@ -212,6 +220,17 @@ export function ScreeningTab({ screenings, relations, entityId, entity }: Props)
                               <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-medium", hasMatch ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")}>
                                 {hasMatch ? "MATCH" : "Clean"}
                               </span>
+                              {/* Manual check status */}
+                              {String(s.review_decision ?? "") !== "" ? (
+                                <span className={cn("rounded px-1 py-0.5 text-[8px] font-medium",
+                                  s.review_decision === "confirmed_match" ? "bg-red-100 text-red-700" :
+                                  s.review_decision === "false_positive" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                                )}>
+                                  ✓ {s.review_decision === "confirmed_match" ? "Confirmé" : s.review_decision === "false_positive" ? "Faux positif" : "En attente"}
+                                </span>
+                              ) : (
+                                <span className="rounded bg-muted px-1 py-0.5 text-[8px] text-muted-foreground">Non revu</span>
+                              )}
                               <span className="font-data text-[8px] text-muted-foreground">
                                 {new Date(s.created_at as string).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                               </span>
@@ -220,10 +239,17 @@ export function ScreeningTab({ screenings, relations, entityId, entity }: Props)
 
                           {isScreenExpanded && (
                             <div className="mt-2 ml-5 space-y-2">
+                              {/* Summary */}
+                              {storedSummary && (
+                                <div className="rounded bg-muted/30 px-3 py-1.5">
+                                  <p className="text-[10px] text-foreground leading-relaxed">{storedSummary}</p>
+                                </div>
+                              )}
+
                               {/* Match details */}
-                              {matches.length > 0 && (
+                              {matchDetails.length > 0 && (
                                 <div className="space-y-1">
-                                  {matches.map((m, mi) => (
+                                  {matchDetails.map((m, mi) => (
                                     <div key={mi} className={cn("rounded px-3 py-2 text-[10px]", hasMatch ? "bg-red-50 border border-red-100" : "bg-muted/30")}>
                                       <p className="font-medium text-foreground">{String(m.name ?? m.title ?? m.function ?? m.list ?? "")}</p>
                                       {String(m.summary ?? "") !== "" && <p className="mt-0.5 text-muted-foreground">{String(m.summary)}</p>}
@@ -231,30 +257,65 @@ export function ScreeningTab({ screenings, relations, entityId, entity }: Props)
                                         {String(m.level ?? "") !== "" && <span className="text-[9px] text-red-600">Niveau : {String(m.level)}</span>}
                                         {String(m.country ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Pays : {String(m.country)}</span>}
                                         {String(m.source ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Source : {String(m.source)}</span>}
-                                        {String(m.matchType ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Type : {String(m.matchType)}</span>}
                                         {m.confidence != null && <span className="font-data text-[9px] text-muted-foreground">Confiance : {String(m.confidence)}%</span>}
                                         {m.relevance != null && <span className="font-data text-[9px] text-muted-foreground">Pertinence : {String(m.relevance)}%</span>}
-                                        {String(m.date ?? "") !== "" && <span className="font-data text-[9px] text-muted-foreground">{String(m.date)}</span>}
                                       </div>
                                     </div>
                                   ))}
                                 </div>
                               )}
 
-                              {/* No match message */}
-                              {!hasMatch && matches.length === 0 && (
+                              {!hasMatch && matchDetails.length === 0 && (
                                 <p className="text-[10px] text-emerald-600">Aucun match trouvé dans les bases vérifiées.</p>
                               )}
 
-                              {/* Review decision */}
-                              {String(s.review_decision ?? "") !== "" && (
-                                <div className={cn("rounded px-2 py-1 text-[10px] font-medium",
-                                  s.review_decision === "confirmed_match" ? "bg-red-50 text-red-700" :
-                                  s.review_decision === "false_positive" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                                )}>
-                                  Revue : {s.review_decision === "confirmed_match" ? "Match confirmé" : s.review_decision === "false_positive" ? "Faux positif" : "En attente de revue"}
+                              {/* Recommendations */}
+                              {storedRecommendations.length > 0 && (
+                                <div>
+                                  <p className="text-[9px] font-medium text-muted-foreground mb-0.5">Recommandations :</p>
+                                  {storedRecommendations.map((r, ri) => (
+                                    <p key={ri} className="text-[9px] text-foreground">→ {r}</p>
+                                  ))}
                                 </div>
                               )}
+
+                              {/* Sources checked from DB */}
+                              {storedSources.length > 0 && (
+                                <div>
+                                  <button onClick={(e) => { e.stopPropagation(); toggleSources(sourcesKey); }} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground">
+                                    {isSourcesExpanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
+                                    <Search className="h-2.5 w-2.5" />
+                                    {storedSources.length} sources vérifiées
+                                  </button>
+                                  {isSourcesExpanded && (
+                                    <div className="mt-1 rounded border border-border/50 divide-y divide-border/30">
+                                      {storedSources.map((src, si) => {
+                                        const isM = src.result.toLowerCase().includes("match") && !src.result.toLowerCase().includes("aucun");
+                                        const isC = src.result.toLowerCase().includes("aucun") || src.result.toLowerCase().includes("négatif");
+                                        return (
+                                          <div key={si} className="flex items-center justify-between px-2.5 py-1">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                              <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", isM ? "bg-red-500" : isC ? "bg-emerald-500" : "bg-amber-500")} />
+                                              <a href={src.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-foreground hover:underline flex items-center gap-0.5 truncate">
+                                                {src.name} <ExternalLink className="h-2 w-2 shrink-0 text-muted-foreground" />
+                                              </a>
+                                            </div>
+                                            <span className={cn("shrink-0 text-[8px] ml-1", isM ? "text-red-600" : isC ? "text-emerald-600" : "text-amber-600")}>{src.result}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Manual review buttons */}
+                              <div className="flex items-center gap-1.5 pt-1 border-t border-border/30">
+                                <span className="text-[9px] text-muted-foreground mr-1">Revue manuelle :</span>
+                                <ReviewButton screeningId={s.id as string} currentDecision={s.review_decision as string | null} decision="confirmed_match" label="✓ Confirmer" />
+                                <ReviewButton screeningId={s.id as string} currentDecision={s.review_decision as string | null} decision="false_positive" label="✗ Faux positif" />
+                                <ReviewButton screeningId={s.id as string} currentDecision={s.review_decision as string | null} decision="pending" label="⏳ En attente" />
+                              </div>
                             </div>
                           )}
                         </div>
@@ -387,5 +448,48 @@ function ScreeningResultCard({ entityId, entityName, isMainEntity, result, expan
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Review Button (manual check) ───────────────────────────────────
+
+function ReviewButton({ screeningId, currentDecision, decision, label }: {
+  screeningId: string; currentDecision: string | null; decision: string; label: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const isActive = currentDecision === decision;
+
+  async function handleClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (isActive) return;
+    setLoading(true);
+    try {
+      await fetch("/api/screening", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ screeningId, decision }),
+      });
+      window.location.reload();
+    } catch {
+      // Error
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const colors: Record<string, string> = {
+    confirmed_match: isActive ? "bg-red-100 text-red-700 border-red-200" : "border-border text-muted-foreground hover:border-red-200 hover:text-red-600",
+    false_positive: isActive ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "border-border text-muted-foreground hover:border-emerald-200 hover:text-emerald-600",
+    pending: isActive ? "bg-amber-100 text-amber-700 border-amber-200" : "border-border text-muted-foreground hover:border-amber-200 hover:text-amber-600",
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading || isActive}
+      className={cn("rounded border px-1.5 py-0.5 text-[8px] transition-colors", colors[decision] ?? "border-border text-muted-foreground")}
+    >
+      {loading ? "..." : label}
+    </button>
   );
 }
