@@ -51,15 +51,34 @@ export async function callClaude(
   systemPrompt: string,
   userMessage: string,
   imageBase64?: string,
+  mediaType?: string,
 ): Promise<{ text: string; model: string; inputTokens: number; outputTokens: number }> {
   const model = MODEL_MAP[task];
   const maxTokens = MAX_TOKENS_MAP[task];
 
+  // Detect media type from base64 header or parameter
+  let detectedMediaType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf" = "image/jpeg";
+  if (mediaType) {
+    detectedMediaType = mediaType as typeof detectedMediaType;
+  } else if (imageBase64) {
+    if (imageBase64.startsWith("/9j/")) detectedMediaType = "image/jpeg";
+    else if (imageBase64.startsWith("iVBOR")) detectedMediaType = "image/png";
+    else if (imageBase64.startsWith("JVBER")) detectedMediaType = "application/pdf";
+  }
+
+  // For PDFs, use document type instead of image
+  const isPdf = detectedMediaType === "application/pdf";
+
   const content: Anthropic.MessageCreateParams["messages"][0]["content"] = imageBase64
-    ? [
-        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageBase64 } },
-        { type: "text", text: userMessage },
-      ]
+    ? isPdf
+      ? [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: imageBase64 } },
+          { type: "text", text: userMessage },
+        ]
+      : [
+          { type: "image", source: { type: "base64", media_type: detectedMediaType as "image/jpeg" | "image/png" | "image/webp", data: imageBase64 } },
+          { type: "text", text: userMessage },
+        ]
     : userMessage;
 
   const response = await client.messages.create({

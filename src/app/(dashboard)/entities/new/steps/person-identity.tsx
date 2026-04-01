@@ -26,10 +26,10 @@ export function PersonIdentityStep({
   const [analyzing, setAnalyzing] = useState(false);
   const [extracted, setExtracted] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function processFile(file: File) {
     if (!file) return;
     update({ documentFile: file });
 
@@ -75,6 +75,31 @@ export function PersonIdentityStep({
     reader.readAsDataURL(file);
   }
 
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }
+
   const canProceed = extracted && data.firstName && data.lastName;
 
   return (
@@ -82,16 +107,20 @@ export function PersonIdentityStep({
       <div>
         <h2 className="mb-1 font-heading text-[18px] text-foreground">Identité</h2>
         <p className="text-[12px] text-muted-foreground">
-          Uploadez le document d&apos;identité. L&apos;IA détecte et extrait automatiquement toutes les informations.
+          Glissez-déposez le document d&apos;identité. L&apos;IA détecte et extrait automatiquement toutes les informations.
         </p>
       </div>
 
-      {/* Document upload — THIS IS THE FIRST AND ONLY ACTION */}
+      {/* Document upload — drag & drop + click */}
       <div
         onClick={() => fileRef.current?.click()}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         className={cn(
           "flex cursor-pointer flex-col items-center gap-4 rounded-md border-2 border-dashed px-6 py-8 transition-all",
           analyzing ? "border-foreground/30 bg-muted/20" :
+          dragOver ? "border-foreground bg-foreground/5 scale-[1.01]" :
           data.documentFile ? "border-emerald-300 bg-emerald-50/50" :
           "border-border hover:border-foreground/20 hover:bg-muted/10",
         )}
@@ -118,17 +147,24 @@ export function PersonIdentityStep({
               <p className="mt-0.5 text-[11px] text-emerald-600">Analysé avec succès · Cliquez pour remplacer</p>
             </div>
           </>
+        ) : dragOver ? (
+          <>
+            <Upload className="h-8 w-8 text-foreground" />
+            <div className="text-center">
+              <p className="text-[13px] font-medium text-foreground">Déposez ici</p>
+            </div>
+          </>
         ) : (
           <>
             <Upload className="h-8 w-8 text-muted-foreground" />
             <div className="text-center">
-              <p className="text-[13px] font-medium text-foreground">Déposez le document d&apos;identité</p>
+              <p className="text-[13px] font-medium text-foreground">Glissez-déposez le document d&apos;identité</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">Passeport, carte d&apos;identité ou titre de séjour</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground/60">PDF, JPG, PNG — max 20 Mo</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground/60">ou cliquez pour parcourir · PDF, JPG, PNG — max 20 Mo</p>
             </div>
           </>
         )}
-        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} className="hidden" />
+        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleInputChange} className="hidden" />
       </div>
 
       {/* AI extracted results — all auto-filled, editable on demand */}

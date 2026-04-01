@@ -22,10 +22,10 @@ export function PersonFundsStep({ data, update, next, back }: {
   const [analyzing, setAnalyzing] = useState(false);
   const [extracted, setExtracted] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function processFile(file: File) {
     if (!file) return;
     update({ fundsFile: file });
     setAnalyzing(true);
@@ -66,12 +66,16 @@ export function PersonFundsStep({ data, update, next, back }: {
         </p>
       </div>
 
-      {/* Upload */}
+      {/* Upload — drag & drop */}
       <div
         onClick={() => fileRef.current?.click()}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) processFile(f); }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
         className={cn(
           "flex cursor-pointer flex-col items-center gap-4 rounded-md border-2 border-dashed px-6 py-8 transition-all",
           analyzing ? "border-foreground/30 bg-muted/20" :
+          dragOver ? "border-foreground bg-foreground/5 scale-[1.01]" :
           data.fundsFile ? "border-emerald-300 bg-emerald-50/50" :
           "border-border hover:border-foreground/20 hover:bg-muted/10",
         )}
@@ -96,16 +100,19 @@ export function PersonFundsStep({ data, update, next, back }: {
               <p className="mt-0.5 text-[11px] text-emerald-600">Analysé · Cliquez pour remplacer</p>
             </div>
           </>
+        ) : dragOver ? (
+          <><Upload className="h-8 w-8 text-foreground" /><p className="text-[13px] font-medium">Déposez ici</p></>
         ) : (
           <>
             <Upload className="h-8 w-8 text-muted-foreground" />
             <div className="text-center">
-              <p className="text-[13px] font-medium">Déposez le justificatif de fonds</p>
+              <p className="text-[13px] font-medium">Glissez-déposez le justificatif</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">Fiche de paie, acte notarié, relevé de portefeuille, bilan...</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground/60">ou cliquez · PDF, JPG, PNG</p>
             </div>
           </>
         )}
-        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleUpload} className="hidden" />
+        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }} className="hidden" />
       </div>
 
       {/* Extracted */}
