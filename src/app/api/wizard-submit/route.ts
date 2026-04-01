@@ -65,6 +65,19 @@ export async function POST(request: NextRequest) {
       userId = newUser?.id ?? null;
     }
 
+    // 0.5 Check for duplicate entity (same name + same type)
+    const { data: existingEntity } = await supabase
+      .from("entities")
+      .select("id")
+      .eq("display_name", displayName)
+      .eq("type", isPerson ? "person" : data.kind === "structure" ? "trust" : "company")
+      .eq("tenant_id", TENANT_ID)
+      .single();
+
+    if (existingEntity) {
+      return NextResponse.json({ error: `Une entité "${displayName}" existe déjà`, entityId: existingEntity.id, duplicate: true }, { status: 409 });
+    }
+
     // 1. Create entity
     const { data: entity, error: entityErr } = await supabase
       .from("entities")

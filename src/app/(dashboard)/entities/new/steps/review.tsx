@@ -82,12 +82,19 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
         }),
       });
 
+      const resData = await res.json();
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Erreur création entité (HTTP ${res.status})`);
+        if (resData.duplicate && resData.entityId) {
+          // Duplicate detected — redirect to existing entity
+          setError(`Cette entité existe déjà. Redirection vers la fiche existante...`);
+          setTimeout(() => router.push(`/entities/${resData.entityId}`), 2000);
+          return;
+        }
+        throw new Error(resData.error || `Erreur création entité (HTTP ${res.status})`);
       }
 
-      const { entityId } = await res.json();
+      const { entityId } = resData;
 
       // Step 2: Upload files ONE BY ONE (avoids body size limit)
       const allFiles: { file: File; docType: string }[] = [];
