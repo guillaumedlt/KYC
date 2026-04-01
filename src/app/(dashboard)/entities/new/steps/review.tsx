@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { CheckCircle, Circle, AlertTriangle, Sparkles, Loader2, Shield } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { submitWizard } from "@/app/actions/wizard-submit";
 import type { WizardData } from "../wizard";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,8 @@ function collectFiles(data: WizardData): { name: string; type: string; base64: s
 export function ReviewStep({ data, back }: { data: WizardData; back: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState("");
+  const router = useRouter();
   const checklist = getChecklist(data);
   const greenCount = checklist.filter((c) => c.status === "green").length;
   const orangeCount = checklist.filter((c) => c.status === "orange").length;
@@ -49,47 +51,77 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
     setSubmitting(true);
     setError(null);
 
-    // Convert files to base64
-    const files: { name: string; type: string; base64: string }[] = [];
-    const singleFiles = [data.documentFile, data.addressFile, data.fundsFile].filter(Boolean) as File[];
-    const multiFiles = [...(data.constitutionFiles || []), ...(data.governanceFiles || []), ...(data.shareholdingFiles || []), ...(data.financialFiles || [])];
-    const fileList = [...singleFiles, ...multiFiles];
-
-    for (const file of fileList) {
-      const base64 = await fileToBase64(file);
-      files.push({ name: file.name, type: file.type, base64 });
-    }
-
     try {
-      await submitWizard({
-        kind: data.kind!,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        nationality: data.nationality,
-        residence: data.residence,
-        dateOfBirth: data.dateOfBirth,
-        documentType: data.documentType,
-        documentNumber: data.documentNumber,
-        documentExpiry: data.documentExpiry,
-        address: data.addressExtracted,
-        fundsSource: data.fundsSource,
-        fundsAmount: data.fundsAmount,
-        companyName: data.companyName,
-        companyType: data.companyType,
-        jurisdiction: data.jurisdiction,
-        regNumber: data.regNumber,
-        industry: data.industry,
-        capital: data.capital,
-        incorporationDate: data.incorporationDate,
-        ubos: data.ubos,
-        riskScore,
-        aiExtractions: data.aiExtractions,
-        files,
+      // Convert files to base64
+      setProgress("Préparation des fichiers...");
+      const files: { name: string; type: string; base64: string; docType: string; confidence: number }[] = [];
+
+      const singleFiles: { file: File; docType: string }[] = [];
+      if (data.documentFile) singleFiles.push({ file: data.documentFile, docType: data.documentType || "passport" });
+      for (const f of (data.additionalIdFiles || [])) singleFiles.push({ file: f, docType: "identity_additional" });
+      if (data.addressFile) singleFiles.push({ file: data.addressFile, docType: "proof_of_address" });
+      for (const f of (data.additionalAddressFiles || [])) singleFiles.push({ file: f, docType: "proof_of_address" });
+      if (data.fundsFile) singleFiles.push({ file: data.fundsFile, docType: "source_of_funds" });
+
+      const multiFileEntries: { file: File; docType: string }[] = [
+        ...(data.constitutionFiles || []).map((f) => ({ file: f, docType: "company_registration" })),
+        ...(data.governanceFiles || []).map((f) => ({ file: f, docType: "governance" })),
+        ...(data.shareholdingFiles || []).map((f) => ({ file: f, docType: "shareholding" })),
+        ...(data.financialFiles || []).map((f) => ({ file: f, docType: "financial_statement" })),
+      ];
+
+      const allFiles = [...singleFiles, ...multiFileEntries];
+
+      for (let i = 0; i < allFiles.length; i++) {
+        setProgress(`Encodage fichier ${i + 1}/${allFiles.length}...`);
+        const { file, docType } = allFiles[i];
+        const base64 = await fileToBase64(file);
+        const conf = parseInt(data.aiExtractions?.identity_confidence ?? data.aiExtractions?.address_confidence ?? "0") || 0;
+        files.push({ name: file.name, type: file.type, base64, docType, confidence: conf });
+      }
+
+      // Submit via API route (not server action — avoids serialization limit)
+      setProgress("Création du dossier...");
+      const res = await fetch("/api/wizard-submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: data.kind,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          nationality: data.nationality,
+          dateOfBirth: data.dateOfBirth,
+          documentType: data.documentType,
+          documentNumber: data.documentNumber,
+          documentExpiry: data.documentExpiry,
+          address: data.addressExtracted,
+          fundsSource: data.fundsSource,
+          fundsAmount: data.fundsAmount,
+          companyName: data.companyName,
+          companyType: data.companyType,
+          jurisdiction: data.jurisdiction,
+          regNumber: data.regNumber,
+          industry: data.industry,
+          capital: data.capital,
+          ubos: data.ubos,
+          riskScore,
+          aiExtractions: data.aiExtractions,
+          files,
+        }),
       });
-      // redirect happens in server action
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const result = await res.json();
+      setProgress("Redirection...");
+      router.push(`/entities/${result.entityId}`);
     } catch (err) {
-      setError("Erreur lors de la soumission. Réessayez.");
+      setError(err instanceof Error ? err.message : "Erreur lors de la soumission. Réessayez.");
       setSubmitting(false);
+      setProgress("");
     }
   }
 
@@ -165,10 +197,13 @@ export function ReviewStep({ data, back }: { data: WizardData; back: () => void 
       {/* Actions */}
       <div className="flex justify-between border-t border-border pt-4">
         <Button variant="ghost" size="sm" onClick={back} className="h-8 text-[11px]">Retour</Button>
-        <Button size="sm" onClick={handleSubmit} disabled={submitting} className="h-8 text-[11px]">
-          {submitting ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Shield className="mr-1.5 h-3 w-3" />}
-          {submitting ? "Soumission en cours..." : "Soumettre le dossier"}
-        </Button>
+        <div className="flex items-center gap-3">
+          {progress && <span className="text-[10px] text-muted-foreground">{progress}</span>}
+          <Button size="sm" onClick={handleSubmit} disabled={submitting} className="h-8 text-[11px]">
+            {submitting ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Shield className="mr-1.5 h-3 w-3" />}
+            {submitting ? "Soumission..." : "Soumettre le dossier"}
+          </Button>
+        </div>
       </div>
     </div>
   );

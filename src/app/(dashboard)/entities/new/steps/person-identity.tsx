@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, Sparkles, CheckCircle, AlertTriangle, Camera, Loader2, Pencil } from "lucide-react";
+import { Upload, Sparkles, CheckCircle, AlertTriangle, Camera, Loader2, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,7 @@ export function PersonIdentityStep({
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const addFileRef = useRef<HTMLInputElement>(null);
 
   async function processFile(file: File) {
     if (!file) return;
@@ -230,9 +231,34 @@ export function PersonIdentityStep({
 
           {data.aiExtractions.identity_confidence && data.aiExtractions.identity_confidence !== "0" && (
             <div className="border-t border-border px-4 py-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
-                <CheckCircle className="h-3 w-3" /> Document analysé avec succès
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+                  <CheckCircle className="h-3 w-3" /> Document analysé avec succès
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); addFileRef.current?.click(); }}
+                  className="flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[9px] text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+                >
+                  <Upload className="h-2.5 w-2.5" /> Ajouter un document
+                </button>
+                <input ref={addFileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files) update({ additionalIdFiles: [...(data.additionalIdFiles || []), ...Array.from(files)] });
+                    e.target.value = "";
+                  }} className="hidden" />
               </div>
+              {(data.additionalIdFiles || []).length > 0 && (
+                <div className="mt-1.5 space-y-0.5">
+                  {data.additionalIdFiles.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between text-[10px]">
+                      <span className="text-muted-foreground">{f.name} ({(f.size/1024).toFixed(0)} Ko)</span>
+                      <button onClick={() => update({ additionalIdFiles: data.additionalIdFiles.filter((_, j) => j !== i) })}
+                        className="text-muted-foreground hover:text-foreground"><X className="h-2.5 w-2.5" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

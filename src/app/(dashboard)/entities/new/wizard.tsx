@@ -26,8 +26,10 @@ export interface WizardData {
   documentNumber: string;
   documentExpiry: string;
   documentFile: File | null;
+  additionalIdFiles: File[];
   selfieFile: File | null;
   addressFile: File | null;
+  additionalAddressFiles: File[];
   addressExtracted: string;
   fundsSource: string;
   fundsFile: File | null;
@@ -56,8 +58,8 @@ const INITIAL_DATA: WizardData = {
   kind: null,
   nationality: "", residence: "", firstName: "", lastName: "",
   dateOfBirth: "", documentType: "passport", documentNumber: "",
-  documentExpiry: "", documentFile: null, selfieFile: null,
-  addressFile: null, addressExtracted: "", fundsSource: "",
+  documentExpiry: "", documentFile: null, additionalIdFiles: [], selfieFile: null,
+  addressFile: null, additionalAddressFiles: [], addressExtracted: "", fundsSource: "",
   fundsFile: null, fundsAmount: "",
   companyName: "", companyType: "", jurisdiction: "", regNumber: "",
   incorporationDate: "", industry: "", capital: "",
