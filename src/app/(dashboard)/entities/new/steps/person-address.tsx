@@ -70,7 +70,7 @@ export function PersonAddressStep({ data, update, next, back }: {
       const extractPromise = fetch("/api/ai-extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "address", base64, mediaType }),
+        body: JSON.stringify({ action: "address", base64, mediaType, clientContext: { firstName: data.firstName, lastName: data.lastName, nationality: data.nationality } }),
       }).then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -78,6 +78,10 @@ export function PersonAddressStep({ data, update, next, back }: {
       const result = await Promise.race([extractPromise, timeoutPromise]);
 
       if (result && result.confidence > 0) {
+        const warnings = result.warnings ?? [];
+        if (result.nameMatch === false) {
+          warnings.push(`Nom sur le document (${result.nameOnDocument ?? "?"}) ≠ client (${data.lastName})`);
+        }
         update({
           addressExtracted: result.address ?? "",
           aiExtractions: {
@@ -86,7 +90,10 @@ export function PersonAddressStep({ data, update, next, back }: {
             address_date: result.documentDate ?? "",
             address_type: result.documentType ?? "",
             address_valid: result.isRecent ? "true" : "false",
+            address_name_match: result.nameMatch ? "true" : "false",
+            address_name_on_doc: result.nameOnDocument ?? "",
           },
+          aiWarnings: [...(data.aiWarnings || []), ...warnings],
         });
       } else {
         update({ addressExtracted: "", aiExtractions: { ...data.aiExtractions, address_confidence: "0" } });

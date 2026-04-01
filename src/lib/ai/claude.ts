@@ -270,27 +270,42 @@ Warnings automatiques :
 // ADDRESS EXTRACTION — Sonnet
 // =============================================================================
 
-export async function extractAddress(imageBase64: string, mediaType?: string): Promise<{
+export async function extractAddress(imageBase64: string, mediaType?: string, clientContext?: { firstName?: string; lastName?: string; nationality?: string }): Promise<{
   address: string | null;
   documentType: string | null;
   documentDate: string | null;
+  nameOnDocument: string | null;
   isRecent: boolean;
+  nameMatch: boolean;
   confidence: number;
   warnings: string[];
 }> {
+  const clientInfo = clientContext
+    ? `\n\nCONTEXTE CLIENT (identité déjà vérifiée) :\n- Nom: ${clientContext.lastName ?? "inconnu"}\n- Prénom(s): ${clientContext.firstName ?? "inconnu"}\n- Nationalité: ${clientContext.nationality ?? "inconnue"}\n\nVÉRIFICATION OBLIGATOIRE : Compare le nom sur ce document avec l'identité du client ci-dessus. Si le nom ne correspond PAS (même partiellement), mets nameMatch à false et ajoute un warning.`
+    : "";
+
   const result = await callClaude(
     "extract",
-    `Tu extrais l'adresse d'un justificatif de domicile.
+    `Tu extrais l'adresse d'un justificatif de domicile et tu vérifies la cohérence avec l'identité du client.${clientInfo}
+
 Réponds UNIQUEMENT en JSON:
 {
   "address": "adresse complète",
-  "documentType": "utility_bill|bank_statement|tax_notice|residence_certificate|other",
+  "documentType": "utility_bill_electricity|utility_bill_water|utility_bill_gas|telecom_bill|bank_statement|tax_notice|insurance_certificate|rent_receipt|residence_certificate|other",
   "documentDate": "JJ/MM/AAAA",
-  "isRecent": true si < 3 mois,
+  "nameOnDocument": "nom tel qu'il apparaît sur le document",
+  "isRecent": true si le document date de moins de 3 mois par rapport à aujourd'hui,
+  "nameMatch": true si le nom sur le document correspond au client (même partiellement — nom de famille suffit),
   "confidence": 0-100,
-  "warnings": []
-}`,
-    "Extrais l'adresse et la date de ce justificatif de domicile.",
+  "warnings": ["liste de problèmes"]
+}
+
+Warnings automatiques :
+- Document de plus de 3 mois : "Document daté de plus de 3 mois (JJ/MM/AAAA)"
+- Nom différent du client : "Le nom sur le document (XXX) ne correspond pas au client (YYY)"
+- Document illisible : "Document de mauvaise qualité"
+- Pas un justificatif de domicile : "Ce document ne semble pas être un justificatif de domicile"`,
+    "Extrais l'adresse, vérifie que le nom sur le document correspond au client, et vérifie la date.",
     imageBase64,
     mediaType,
   );
@@ -298,7 +313,7 @@ Réponds UNIQUEMENT en JSON:
   try {
     return JSON.parse(result.text);
   } catch {
-    return { address: null, documentType: null, documentDate: null, isRecent: false, confidence: 0, warnings: ["Extraction échouée"] };
+    return { address: null, documentType: null, documentDate: null, nameOnDocument: null, isRecent: false, nameMatch: true, confidence: 0, warnings: ["Extraction échouée"] };
   }
 }
 
@@ -380,25 +395,54 @@ NOTE: Tu n'as pas accès aux bases de données PEP/sanctions en temps réel. Bas
 // FUNDS SOURCE EXTRACTION — Sonnet
 // =============================================================================
 
-export async function extractFundsSource(imageBase64: string, mediaType?: string): Promise<{
+export async function extractFundsSource(imageBase64: string, mediaType?: string, clientContext?: { firstName?: string; lastName?: string; nationality?: string }): Promise<{
   sourceType: string;
   amount: string | null;
   employer: string | null;
   period: string | null;
+  nameOnDocument: string | null;
+  nameMatch: boolean;
   confidence: number;
+  warnings: string[];
 }> {
+  const clientInfo = clientContext
+    ? `\n\nCONTEXTE CLIENT (identité déjà vérifiée) :\n- Nom: ${clientContext.lastName ?? "inconnu"}\n- Prénom(s): ${clientContext.firstName ?? "inconnu"}\n- Nationalité: ${clientContext.nationality ?? "inconnue"}\n\nVÉRIFICATION OBLIGATOIRE :\n1. Vérifie que le nom sur ce document correspond au client. Si non → nameMatch = false + warning.\n2. Vérifie que ce document est bien un justificatif de source de fonds (pas un document sans rapport).\n3. Vérifie la cohérence entre le montant et le type de source déclaré.`
+    : "";
+
   const result = await callClaude(
     "extract",
-    `Tu extrais les informations d'un justificatif de source de fonds (fiche de paie, acte de vente, relevé, etc.).
+    `Tu extrais les informations d'un justificatif de source de fonds ET tu vérifies la cohérence avec l'identité du client.${clientInfo}
+
+Types de source :
+- salary : Fiche de paie, bulletin de salaire, attestation employeur
+- real_estate : Acte de vente immobilière, attestation notaire
+- inheritance : Acte de succession, certificat d'héritage, donation
+- investment : Relevé de portefeuille, avis d'opéré, plus-value
+- business : Bilan, liasse fiscale, revenus d'activité
+- pension : Pension de retraite, rente
+- rental_income : Revenus locatifs, quittances
+- insurance : Rachat d'assurance-vie, indemnité
+- loan : Contrat de prêt
+- other : Autre source
+
 Réponds UNIQUEMENT en JSON:
 {
-  "sourceType": "salary|real_estate|inheritance|investment|business|other",
-  "amount": "montant avec devise",
-  "employer": "nom de l'employeur ou source si applicable",
-  "period": "période couverte",
-  "confidence": 0-100
-}`,
-    "Extrais les informations de source de fonds de ce document.",
+  "sourceType": "salary|real_estate|inheritance|investment|business|pension|rental_income|insurance|loan|other",
+  "amount": "montant avec devise (ex: 4 500 EUR)",
+  "employer": "nom de l'employeur, du notaire, de la banque, ou de la source",
+  "period": "période couverte (ex: Mars 2026, Année 2025, etc.)",
+  "nameOnDocument": "nom de la personne tel qu'il apparaît sur le document",
+  "nameMatch": true si le nom correspond au client,
+  "confidence": 0-100,
+  "warnings": ["liste de problèmes"]
+}
+
+Warnings automatiques :
+- Nom différent : "Le nom sur le document (XXX) ne correspond pas au client (YYY)"
+- Document sans rapport : "Ce document ne semble pas être un justificatif de source de fonds"
+- Montant incohérent : "Montant inhabituellement élevé/faible pour ce type de source"
+- Document ancien : "Document daté de plus de 12 mois"`,
+    "Extrais les informations de source de fonds. Vérifie que le nom correspond au client.",
     imageBase64,
     mediaType,
   );
@@ -406,6 +450,6 @@ Réponds UNIQUEMENT en JSON:
   try {
     return JSON.parse(result.text);
   } catch {
-    return { sourceType: "other", amount: null, employer: null, period: null, confidence: 0 };
+    return { sourceType: "other", amount: null, employer: null, period: null, nameOnDocument: null, nameMatch: true, confidence: 0, warnings: ["Extraction échouée"] };
   }
 }

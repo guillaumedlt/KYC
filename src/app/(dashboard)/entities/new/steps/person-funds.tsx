@@ -75,7 +75,7 @@ export function PersonFundsStep({ data, update, next, back }: {
       const extractPromise = fetch("/api/ai-extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "funds", base64, mediaType }),
+        body: JSON.stringify({ action: "funds", base64, mediaType, clientContext: { firstName: data.firstName, lastName: data.lastName, nationality: data.nationality } }),
       }).then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -83,6 +83,10 @@ export function PersonFundsStep({ data, update, next, back }: {
       const result = await Promise.race([extractPromise, timeoutPromise]);
 
       if (result && result.confidence > 0) {
+        const warnings = result.warnings ?? [];
+        if (result.nameMatch === false) {
+          warnings.push(`Nom sur le document (${result.nameOnDocument ?? "?"}) ≠ client (${data.lastName})`);
+        }
         update({
           fundsSource: result.sourceType ?? "other",
           fundsAmount: result.amount ?? "",
@@ -92,7 +96,10 @@ export function PersonFundsStep({ data, update, next, back }: {
             funds_type_detected: result.sourceType ?? "",
             funds_employer: result.employer ?? "",
             funds_period: result.period ?? "",
+            funds_name_match: result.nameMatch ? "true" : "false",
+            funds_name_on_doc: result.nameOnDocument ?? "",
           },
+          aiWarnings: [...(data.aiWarnings || []), ...warnings],
         });
       } else {
         setEditMode(true);

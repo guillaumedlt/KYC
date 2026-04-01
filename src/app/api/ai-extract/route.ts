@@ -6,7 +6,7 @@ export const maxDuration = 60; // Allow up to 60s for AI processing
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, base64, mediaType, docType, fileName } = body;
+    const { action, base64, mediaType, docType, fileName, clientContext } = body;
 
     if (!action) {
       return NextResponse.json({ error: "Missing action" }, { status: 400 });
@@ -27,11 +27,11 @@ export async function POST(request: NextRequest) {
         break;
       case "address":
         if (!base64) return NextResponse.json({ error: "Missing base64" }, { status: 400 });
-        result = await extractAddress(base64, mediaType);
+        result = await extractAddress(base64, mediaType, clientContext);
         break;
       case "funds":
         if (!base64) return NextResponse.json({ error: "Missing base64" }, { status: 400 });
-        result = await extractFundsSource(base64, mediaType);
+        result = await extractFundsSource(base64, mediaType, clientContext);
         break;
       case "company":
         if (!base64) return NextResponse.json({ error: "Missing base64" }, { status: 400 });
