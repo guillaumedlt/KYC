@@ -1,46 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, X, Loader2, GripVertical } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CATEGORY_LABELS } from "@/lib/risk-matrices";
+import {
+  AMSF_FACTOR_IDS,
+  AMSF_FACTOR_DEFINITIONS,
+  RISK_LEVEL_LABELS,
+  RISK_LEVEL_COLORS,
+  VIGILANCE_LABELS,
+  VIGILANCE_COLORS,
+  computeOverallLevel,
+  riskLevelToVigilance,
+  riskLevelToReviewFrequency,
+} from "@/lib/risk-matrices";
+import type { RiskLevel, AmsfFactorId } from "@/lib/risk-matrices";
 import { cn } from "@/lib/utils";
 
 interface FactorDraft {
-  id: string;
-  category: string;
-  name: string;
-  description: string;
-  weight: number;
-  conditions: string;
+  id: AmsfFactorId;
+  level: RiskLevel;
+  justification: string;
 }
 
-interface ThresholdDraft {
-  level: string;
-  label: string;
-  minScore: number;
-  maxScore: number;
-  reviewFrequency: string;
-}
+const RISK_LEVELS: RiskLevel[] = ["faible", "moyen", "eleve"];
 
-const CATEGORIES = Object.entries(CATEGORY_LABELS);
-
-const DEFAULT_THRESHOLDS: ThresholdDraft[] = [
-  { level: "simplified", label: "Simplifiée", minScore: 0, maxScore: 25, reviewFrequency: "Tous les 3 ans" },
-  { level: "standard", label: "Standard", minScore: 26, maxScore: 59, reviewFrequency: "Annuelle" },
-  { level: "enhanced", label: "Renforcée", minScore: 60, maxScore: 79, reviewFrequency: "Semestrielle" },
-  { level: "prohibited", label: "Interdite", minScore: 80, maxScore: 100, reviewFrequency: "Rejet" },
-];
-
-const ENTITY_TYPES = [
-  { value: "person", label: "Personne" },
-  { value: "company", label: "Société" },
-  { value: "trust", label: "Trust" },
-  { value: "foundation", label: "Fondation" },
+const SECTORS = [
+  { value: "immobilier", label: "Immobilier" },
+  { value: "societe", label: "Creation de societe" },
+  { value: "patrimoine", label: "Gestion de patrimoine" },
+  { value: "banque", label: "Banque privee" },
+  { value: "trust", label: "Trust & Fondation" },
+  { value: "crypto", label: "Crypto-actifs" },
+  { value: "assurance", label: "Assurance" },
+  { value: "autre", label: "Autre" },
 ];
 
 export function MatrixBuilder() {
@@ -49,63 +46,59 @@ export function MatrixBuilder() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("📋");
-  const [entityTypes, setEntityTypes] = useState<string[]>(["person", "company"]);
-  const [factors, setFactors] = useState<FactorDraft[]>([]);
-  const [thresholds, setThresholds] = useState<ThresholdDraft[]>(DEFAULT_THRESHOLDS);
+  const [sector, setSector] = useState("autre");
+  const [expandedFactor, setExpandedFactor] = useState<AmsfFactorId | null>(AMSF_FACTOR_IDS[0]);
 
-  function addFactor() {
-    setFactors([...factors, {
-      id: `f-${Date.now()}`,
-      category: "client",
-      name: "",
-      description: "",
-      weight: 10,
-      conditions: "",
-    }]);
+  const [factors, setFactors] = useState<FactorDraft[]>(
+    AMSF_FACTOR_IDS.map((id) => ({
+      id,
+      level: "moyen" as RiskLevel,
+      justification: "",
+    }))
+  );
+
+  function updateFactor(id: AmsfFactorId, field: keyof Omit<FactorDraft, "id">, value: string) {
+    setFactors(factors.map((f) =>
+      f.id === id ? { ...f, [field]: value } : f
+    ));
   }
 
-  function updateFactor(id: string, field: keyof FactorDraft, value: string | number) {
-    setFactors(factors.map((f) => f.id === id ? { ...f, [field]: value } : f));
-  }
+  const overallLevel = useMemo(
+    () => computeOverallLevel(factors),
+    [factors]
+  );
 
-  function removeFactor(id: string) {
-    setFactors(factors.filter((f) => f.id !== id));
-  }
+  const vigilanceLevel = riskLevelToVigilance(overallLevel);
+  const reviewFrequency = riskLevelToReviewFrequency(overallLevel);
+  const overallColors = RISK_LEVEL_COLORS[overallLevel];
+  const vigColors = VIGILANCE_COLORS[vigilanceLevel];
 
-  function updateThreshold(index: number, field: keyof ThresholdDraft, value: string | number) {
-    const updated = [...thresholds];
-    updated[index] = { ...updated[index], [field]: value };
-    setThresholds(updated);
-  }
-
-  function toggleEntityType(type: string) {
-    setEntityTypes((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
-  }
+  const allJustified = factors.every((f) => f.justification.trim().length >= 10);
 
   function handleSave() {
-    if (!name || factors.length === 0) return;
+    if (!name || !allJustified) return;
     setSaving(true);
-    // TODO: persist to Supabase (for now, save to localStorage as demo)
     const matrix = {
       id: `matrix-custom-${Date.now()}`,
       name,
       description,
       icon,
+      sector,
       isPreset: false,
-      entityTypes,
-      factors: factors.map((f) => ({
-        id: f.id,
-        category: f.category,
-        name: f.name,
-        description: f.description,
-        weight: f.weight,
-        conditions: f.conditions.split(",").map((c) => c.trim()).filter(Boolean),
-      })),
-      thresholds: thresholds.map((t) => ({
-        ...t,
-        requiredDocs: [],
-        color: t.level === "simplified" ? "emerald" : t.level === "standard" ? "blue" : t.level === "enhanced" ? "orange" : "red",
-      })),
+      factors: factors.map((f) => {
+        const def = AMSF_FACTOR_DEFINITIONS[f.id];
+        return {
+          id: f.id,
+          name: def.name,
+          description: def.description,
+          level: f.level,
+          justification: f.justification,
+          examples: def.examples[f.level],
+        };
+      }),
+      overallLevel,
+      vigilanceLevel,
+      reviewFrequency,
       createdAt: new Date().toISOString(),
     };
     const existing = JSON.parse(localStorage.getItem("custom_matrices") ?? "[]");
@@ -115,8 +108,6 @@ export function MatrixBuilder() {
     router.push("/risk/matrices");
   }
 
-  const totalMaxWeight = factors.reduce((s, f) => s + f.weight, 0);
-
   return (
     <div className="mx-auto max-w-2xl">
       <Link href="/risk/matrices" className="mb-4 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
@@ -124,15 +115,17 @@ export function MatrixBuilder() {
       </Link>
 
       <h1 className="mb-1 font-heading text-[22px] text-foreground">Nouvelle matrice de risque</h1>
-      <p className="mb-6 text-[12px] text-muted-foreground">Définissez les facteurs de risque, leurs poids et les seuils de vigilance.</p>
+      <p className="mb-6 text-[12px] text-muted-foreground">
+        Evaluez les 5 facteurs de risque obligatoires AMSF/SICCFIN. Pour chaque facteur, selectionnez un niveau (Faible, Moyen, Eleve) et justifiez votre evaluation.
+      </p>
 
       <div className="space-y-6">
         {/* General info */}
         <section className="rounded-md border border-border bg-card p-4">
-          <span className="mb-3 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Informations</span>
+          <span className="mb-3 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Informations generales</span>
           <div className="grid grid-cols-[60px_1fr] gap-4">
             <div className="space-y-1.5">
-              <Label className="text-[11px]">Icône</Label>
+              <Label className="text-[11px]">Icone</Label>
               <Input value={icon} onChange={(e) => setIcon(e.target.value)} className="h-9 text-center text-[18px]" maxLength={2} />
             </div>
             <div className="space-y-1.5">
@@ -145,105 +138,179 @@ export function MatrixBuilder() {
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Focus sur..." className="h-9 text-[12px]" />
           </div>
           <div className="mt-3 space-y-1.5">
-            <Label className="text-[11px]">S&apos;applique à</Label>
-            <div className="flex gap-2">
-              {ENTITY_TYPES.map((et) => (
-                <button key={et.value} onClick={() => toggleEntityType(et.value)}
-                  className={cn("rounded-md border px-3 py-1.5 text-[11px] transition-all",
-                    entityTypes.includes(et.value) ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:border-foreground/20")}>
-                  {et.label}
-                </button>
+            <Label className="text-[11px]">Secteur d&apos;activite</Label>
+            <select
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              className="h-9 w-full rounded-md border border-border bg-background px-3 text-[12px] focus:border-foreground/30 focus:outline-none"
+            >
+              {SECTORS.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
               ))}
-            </div>
+            </select>
           </div>
         </section>
 
-        {/* Factors */}
+        {/* 5 AMSF Factors */}
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Facteurs de risque ({factors.length})</span>
-              {totalMaxWeight > 0 && <span className="ml-2 font-data text-[10px] text-muted-foreground">Poids total max: {totalMaxWeight}</span>}
-            </div>
-            <Button size="sm" variant="outline" onClick={addFactor} className="h-7 rounded-md px-2 text-[11px]">
-              <Plus className="mr-1 h-3 w-3" /> Ajouter un facteur
-            </Button>
+            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              5 facteurs de risque AMSF ({factors.filter((f) => f.justification.trim().length >= 10).length}/5 justifies)
+            </span>
           </div>
 
-          {factors.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-card px-6 py-8 text-center">
-              <p className="text-[12px] text-muted-foreground">Aucun facteur défini</p>
-              <p className="mt-1 text-[11px] text-muted-foreground/60">Ajoutez les critères de risque et leur pondération</p>
-              <Button size="sm" variant="outline" onClick={addFactor} className="mt-3 h-7 rounded-md px-3 text-[11px]">
-                <Plus className="mr-1 h-3 w-3" /> Premier facteur
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {factors.map((f) => (
-                <div key={f.id} className="rounded-md border border-border bg-card p-3">
-                  <div className="flex items-start gap-2">
-                    <GripVertical className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/30" />
-                    <div className="flex-1 space-y-2">
-                      <div className="grid grid-cols-[120px_1fr_60px] gap-2">
-                        <select value={f.category} onChange={(e) => updateFactor(f.id, "category", e.target.value)}
-                          className="h-8 rounded-md border border-border bg-background px-2 text-[11px] focus:border-foreground/30 focus:outline-none">
-                          {CATEGORIES.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
-                        <Input value={f.name} onChange={(e) => updateFactor(f.id, "name", e.target.value)} placeholder="Nom du facteur" className="h-8 text-[11px]" />
-                        <div className="relative">
-                          <Input type="number" min={0} max={30} value={f.weight} onChange={(e) => updateFactor(f.id, "weight", parseInt(e.target.value) || 0)} className="h-8 pr-6 font-data text-[11px]" />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">pts</span>
+          <div className="space-y-2">
+            {factors.map((f) => {
+              const def = AMSF_FACTOR_DEFINITIONS[f.id];
+              const colors = RISK_LEVEL_COLORS[f.level];
+              const isExpanded = expandedFactor === f.id;
+              const isJustified = f.justification.trim().length >= 10;
+
+              return (
+                <div key={f.id} className={cn(
+                  "rounded-md border bg-card transition-all",
+                  isJustified ? colors.border : "border-border",
+                )}>
+                  {/* Factor header — clickable */}
+                  <button
+                    onClick={() => setExpandedFactor(isExpanded ? null : f.id)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  >
+                    <div className="flex-1">
+                      <p className="text-[12px] font-medium text-foreground">{def.name}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">{def.description}</p>
+                    </div>
+                    <div className="ml-3 flex items-center gap-2">
+                      <span className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium",
+                        colors.bg, colors.text,
+                      )}>
+                        <span className={cn("h-1.5 w-1.5 rounded-full", colors.dot)} />
+                        {RISK_LEVEL_LABELS[f.level]}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: "inherit" }}>
+                      {/* Level selector */}
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-[0.05em] text-muted-foreground">Niveau de risque</Label>
+                        <div className="mt-1.5 flex gap-1.5">
+                          {RISK_LEVELS.map((lvl) => {
+                            const lvlColors = RISK_LEVEL_COLORS[lvl];
+                            const isActive = f.level === lvl;
+                            return (
+                              <button
+                                key={lvl}
+                                onClick={() => updateFactor(f.id, "level", lvl)}
+                                className={cn(
+                                  "flex-1 rounded-md border py-2 text-center text-[11px] font-medium transition-all",
+                                  isActive
+                                    ? cn(lvlColors.bg, lvlColors.text, lvlColors.border)
+                                    : "border-border text-muted-foreground hover:border-foreground/20",
+                                )}
+                              >
+                                {RISK_LEVEL_LABELS[lvl]}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                      <Input value={f.description} onChange={(e) => updateFactor(f.id, "description", e.target.value)} placeholder="Description" className="h-7 text-[10px]" />
-                      <Input value={f.conditions} onChange={(e) => updateFactor(f.id, "conditions", e.target.value)} placeholder="Conditions (séparées par des virgules)" className="h-7 text-[10px]" />
+
+                      {/* Examples for the selected level */}
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-[0.05em] text-muted-foreground">
+                          Exemples AMSF ({RISK_LEVEL_LABELS[f.level]})
+                        </Label>
+                        <ul className="mt-1 space-y-0.5">
+                          {def.examples[f.level].map((ex, i) => (
+                            <li key={i} className="flex items-start gap-2 text-[10px] text-muted-foreground">
+                              <span className={cn("mt-1.5 h-1 w-1 shrink-0 rounded-full", colors.dot)} />
+                              {ex}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Justification */}
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-[0.05em] text-muted-foreground">
+                          Justification (obligatoire, min. 10 car.)
+                        </Label>
+                        <textarea
+                          value={f.justification}
+                          onChange={(e) => updateFactor(f.id, "justification", e.target.value)}
+                          placeholder="Expliquez pourquoi ce niveau de risque a ete retenu pour ce facteur..."
+                          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-[11px] leading-relaxed focus:border-foreground/30 focus:outline-none"
+                          rows={3}
+                        />
+                        {f.justification.length > 0 && f.justification.length < 10 && (
+                          <p className="mt-1 text-[10px] text-red-500">Minimum 10 caracteres requis</p>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => removeFactor(f.id)} className="mt-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </section>
 
-        {/* Thresholds */}
+        {/* Overall determination (auto-computed) */}
         <section className="rounded-md border border-border bg-card p-4">
-          <span className="mb-3 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Seuils de vigilance</span>
-          <div className="space-y-2">
-            {thresholds.map((t, i) => (
-              <div key={t.level} className={cn("flex items-center gap-3 rounded-md px-3 py-2",
-                t.level === "simplified" ? "bg-emerald-50/50" : t.level === "standard" ? "bg-blue-50/50" : t.level === "enhanced" ? "bg-orange-50/50" : "bg-red-50/50",
-              )}>
-                <span className="w-20 text-[11px] font-medium">{t.label}</span>
-                <div className="flex items-center gap-1">
-                  <Input type="number" min={0} max={100} value={t.minScore} onChange={(e) => updateThreshold(i, "minScore", parseInt(e.target.value) || 0)} className="h-7 w-14 font-data text-[11px]" />
-                  <span className="text-[10px] text-muted-foreground">—</span>
-                  <Input type="number" min={0} max={100} value={t.maxScore} onChange={(e) => updateThreshold(i, "maxScore", parseInt(e.target.value) || 0)} className="h-7 w-14 font-data text-[11px]" />
-                </div>
-                <Input value={t.reviewFrequency} onChange={(e) => updateThreshold(i, "reviewFrequency", e.target.value)} className="h-7 flex-1 text-[11px]" />
-              </div>
-            ))}
+          <span className="mb-3 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            Determination automatique
+          </span>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className={cn("rounded-md border p-3", overallColors.border, overallColors.bg)}>
+              <p className="text-[10px] text-muted-foreground">Risque global</p>
+              <p className={cn("mt-1 text-[16px] font-semibold", overallColors.text)}>
+                {RISK_LEVEL_LABELS[overallLevel]}
+              </p>
+            </div>
+            <div className={cn("rounded-md border p-3", vigColors.border, vigColors.bg)}>
+              <p className="text-[10px] text-muted-foreground">Vigilance</p>
+              <p className={cn("mt-1 text-[16px] font-semibold", vigColors.text)}>
+                {VIGILANCE_LABELS[vigilanceLevel]}
+              </p>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] text-muted-foreground">Revue</p>
+              <p className="mt-1 text-[16px] font-semibold text-foreground">
+                {reviewFrequency}
+              </p>
+            </div>
           </div>
 
-          {/* Score bar preview */}
-          <div className="mt-3 flex h-2.5 overflow-hidden rounded-full">
-            {thresholds.map((t) => (
-              <div key={t.level} className={cn("h-full",
-                t.level === "simplified" ? "bg-emerald-400" : t.level === "standard" ? "bg-blue-400" : t.level === "enhanced" ? "bg-orange-400" : "bg-red-400",
-              )} style={{ width: `${t.maxScore - t.minScore + 1}%` }} />
-            ))}
+          {/* Factor visualization */}
+          <div className="mt-3 flex gap-0.5">
+            {factors.map((f) => {
+              const fc = RISK_LEVEL_COLORS[f.level];
+              return (
+                <div key={f.id} className={cn("h-2 flex-1 rounded-full", fc.dot)} title={AMSF_FACTOR_DEFINITIONS[f.id].name} />
+              );
+            })}
           </div>
+
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Regle AMSF : si un facteur est Eleve, le risque global est au minimum Moyen. Si 2+ facteurs sont Eleve, le risque global est Eleve.
+          </p>
         </section>
 
         {/* Actions */}
         <div className="flex justify-between border-t border-border pt-4">
           <Link href="/risk/matrices" className="text-[11px] text-muted-foreground hover:text-foreground">Annuler</Link>
-          <Button size="sm" onClick={handleSave} disabled={!name || factors.length === 0 || saving} className="h-8 text-[11px]">
+          <Button size="sm" onClick={handleSave} disabled={!name || !allJustified || saving} className="h-8 text-[11px]">
             {saving && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
-            Créer la matrice
+            Creer la matrice
           </Button>
         </div>
       </div>

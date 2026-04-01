@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Shield, AlertTriangle } from "lucide-react";
-import { PRESET_MATRICES, CATEGORY_LABELS } from "@/lib/risk-matrices";
+import { ArrowLeft, Shield, Clock, Eye } from "lucide-react";
+import {
+  PRESET_MATRICES,
+  RISK_LEVEL_LABELS,
+  RISK_LEVEL_COLORS,
+  VIGILANCE_LABELS,
+  VIGILANCE_COLORS,
+  AMSF_FACTOR_DEFINITIONS,
+} from "@/lib/risk-matrices";
+import type { RiskLevel } from "@/lib/risk-matrices";
 import { cn } from "@/lib/utils";
 
 export default async function MatrixDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -9,13 +17,8 @@ export default async function MatrixDetailPage({ params }: { params: Promise<{ i
   const matrix = PRESET_MATRICES.find((m) => m.id === id);
   if (!matrix) notFound();
 
-  // Group factors by category
-  const grouped = matrix.factors.reduce<Record<string, typeof matrix.factors>>((acc, f) => {
-    (acc[f.category] ??= []).push(f);
-    return acc;
-  }, {});
-
-  const maxWeight = Math.max(...matrix.factors.map((f) => f.weight));
+  const overallColors = RISK_LEVEL_COLORS[matrix.overallLevel];
+  const vigColors = VIGILANCE_COLORS[matrix.vigilanceLevel];
 
   return (
     <div>
@@ -36,112 +39,177 @@ export default async function MatrixDetailPage({ params }: { params: Promise<{ i
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* Factors */}
-        <div className="space-y-5">
+        <div className="space-y-4">
           <span className="block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-            Facteurs de risque ({matrix.factors.length})
+            5 facteurs de risque AMSF/SICCFIN
           </span>
 
-          {Object.entries(grouped).map(([cat, factors]) => (
-            <div key={cat}>
-              <span className="mb-2 block text-[11px] font-medium text-foreground">
-                {CATEGORY_LABELS[cat]} ({factors.length})
-              </span>
-              <div className="space-y-1.5">
-                {factors.sort((a, b) => b.weight - a.weight).map((f) => (
-                  <div key={f.id} className="rounded-md border border-border bg-card px-4 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className={cn(
-                          "w-8 font-data text-[12px] font-semibold",
-                          f.weight >= 25 ? "text-red-600" : f.weight >= 15 ? "text-orange-600" : f.weight >= 10 ? "text-amber-600" : "text-muted-foreground",
-                        )}>
-                          +{f.weight}
-                        </span>
-                        <div>
-                          <p className="text-[12px] font-medium text-foreground">{f.name}</p>
-                          <p className="text-[11px] text-muted-foreground">{f.description}</p>
-                        </div>
-                      </div>
-                      {/* Weight bar */}
-                      <div className="hidden w-20 sm:block">
-                        <div className="h-1.5 w-full rounded-full bg-muted">
-                          <div className={cn("h-1.5 rounded-full",
-                            f.weight >= 25 ? "bg-red-500" : f.weight >= 15 ? "bg-orange-500" : f.weight >= 10 ? "bg-amber-500" : "bg-stone-300",
-                          )} style={{ width: `${(f.weight / maxWeight) * 100}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                    {/* Conditions */}
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {f.conditions.map((c, i) => (
-                        <span key={i} className="rounded bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">{c}</span>
-                      ))}
-                    </div>
+          {matrix.factors.map((factor) => {
+            const colors = RISK_LEVEL_COLORS[factor.level];
+            const allExamples = AMSF_FACTOR_DEFINITIONS[factor.id].examples;
+
+            return (
+              <div key={factor.id} className={cn("rounded-md border bg-card", colors.border)}>
+                {/* Factor header */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex-1">
+                    <p className="text-[12px] font-medium text-foreground">{factor.name}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{factor.description}</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Thresholds */}
-        <div>
-          <span className="mb-3 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-            Seuils de vigilance
-          </span>
-          <div className="space-y-2">
-            {matrix.thresholds.map((t) => (
-              <div key={t.level} className={cn(
-                "rounded-md border px-4 py-3",
-                t.color === "emerald" ? "border-emerald-200 bg-emerald-50/50" :
-                t.color === "blue" ? "border-blue-200 bg-blue-50/50" :
-                t.color === "orange" ? "border-orange-200 bg-orange-50/50" :
-                "border-red-200 bg-red-50/50",
-              )}>
-                <div className="flex items-center justify-between">
-                  <p className="text-[12px] font-medium text-foreground">{t.label}</p>
-                  <span className="font-data text-[11px] text-muted-foreground">{t.minScore}–{t.maxScore}</span>
+                  <span className={cn(
+                    "ml-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold",
+                    colors.bg, colors.text,
+                  )}>
+                    <span className={cn("h-2 w-2 rounded-full", colors.dot)} />
+                    {RISK_LEVEL_LABELS[factor.level]}
+                  </span>
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">Revue : {t.reviewFrequency}</p>
-                {t.requiredDocs.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {t.requiredDocs.map((d) => (
-                      <span key={d} className="rounded bg-white/60 px-1.5 py-0.5 text-[9px] text-muted-foreground">{d.replace(/_/g, " ")}</span>
-                    ))}
+
+                {/* Justification */}
+                <div className="border-t px-4 py-3" style={{ borderColor: "inherit" }}>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Justification</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-foreground/80">{factor.justification}</p>
+                </div>
+
+                {/* Examples for this level */}
+                {factor.examples && factor.examples.length > 0 && (
+                  <div className="border-t px-4 py-3" style={{ borderColor: "inherit" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      Exemples ({RISK_LEVEL_LABELS[factor.level]})
+                    </p>
+                    <ul className="mt-1.5 space-y-1">
+                      {factor.examples.map((ex, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                          <span className={cn("mt-1.5 h-1 w-1 shrink-0 rounded-full", colors.dot)} />
+                          {ex}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
+
+                {/* 3-level scale visualization */}
+                <div className="border-t px-4 py-2.5" style={{ borderColor: "inherit" }}>
+                  <div className="flex gap-1">
+                    {(["faible", "moyen", "eleve"] as RiskLevel[]).map((lvl) => {
+                      const isActive = lvl === factor.level;
+                      const lvlColors = RISK_LEVEL_COLORS[lvl];
+                      return (
+                        <div key={lvl} className={cn(
+                          "flex-1 rounded py-1 text-center text-[9px] font-medium transition-all",
+                          isActive ? cn(lvlColors.bg, lvlColors.text) : "bg-muted/50 text-muted-foreground/40",
+                        )}>
+                          {RISK_LEVEL_LABELS[lvl]}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+
+        {/* Sidebar: Overall determination */}
+        <div className="space-y-4">
+          {/* Overall risk level */}
+          <div className={cn("rounded-md border p-4", overallColors.border, overallColors.bg)}>
+            <span className="mb-2 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              Niveau de risque global
+            </span>
+            <div className="flex items-center gap-2">
+              <span className={cn("h-3 w-3 rounded-full", overallColors.dot)} />
+              <span className={cn("text-[20px] font-semibold", overallColors.text)}>
+                {RISK_LEVEL_LABELS[matrix.overallLevel]}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-foreground/70">
+              Determine par la combinaison des 5 facteurs AMSF. Si un facteur est Eleve, le niveau global est au minimum Moyen.
+            </p>
           </div>
 
-          {/* Score visualization */}
-          <div className="mt-4 rounded-md border border-border bg-card p-4">
-            <span className="mb-2 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Échelle de score</span>
-            <div className="flex h-3 overflow-hidden rounded-full">
-              {matrix.thresholds.map((t) => {
-                const width = t.maxScore - t.minScore + 1;
+          {/* Vigilance level */}
+          <div className={cn("rounded-md border p-4", vigColors.border, vigColors.bg)}>
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-current opacity-60" />
+              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                Niveau de vigilance
+              </span>
+            </div>
+            <p className={cn("mt-2 text-[16px] font-semibold", vigColors.text)}>
+              {VIGILANCE_LABELS[matrix.vigilanceLevel]}
+            </p>
+            <p className="mt-1 text-[10px] text-foreground/60">
+              {matrix.vigilanceLevel === "simplifiee" && "Mesures allegees conformement a l'Art. 15-1 Loi 1.362"}
+              {matrix.vigilanceLevel === "standard" && "Mesures normales conformement a l'Art. 4 Loi 1.362"}
+              {matrix.vigilanceLevel === "renforcee" && "Mesures renforcees obligatoires — Art. 15-2 Loi 1.362"}
+            </p>
+          </div>
+
+          {/* Review frequency */}
+          <div className="rounded-md border border-border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                Frequence de revue
+              </span>
+            </div>
+            <p className="mt-2 text-[16px] font-semibold text-foreground">
+              {matrix.reviewFrequency}
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Faible = 3 ans · Moyen = 2 ans · Eleve = 1 an
+            </p>
+          </div>
+
+          {/* Factor summary */}
+          <div className="rounded-md border border-border bg-card p-4">
+            <span className="mb-3 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              Synthese des facteurs
+            </span>
+            <div className="space-y-2">
+              {matrix.factors.map((f) => {
+                const fc = RISK_LEVEL_COLORS[f.level];
                 return (
-                  <div key={t.level} className={cn("h-full",
-                    t.color === "emerald" ? "bg-emerald-400" : t.color === "blue" ? "bg-blue-400" : t.color === "orange" ? "bg-orange-400" : "bg-red-400",
-                  )} style={{ width: `${width}%` }} title={`${t.label}: ${t.minScore}-${t.maxScore}`} />
+                  <div key={f.id} className="flex items-center justify-between">
+                    <span className="text-[11px] text-foreground/80 truncate pr-2">
+                      {f.name.split("/")[0].trim()}
+                    </span>
+                    <span className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium",
+                      fc.bg, fc.text,
+                    )}>
+                      {RISK_LEVEL_LABELS[f.level]}
+                    </span>
+                  </div>
                 );
               })}
             </div>
-            <div className="mt-1 flex justify-between font-data text-[9px] text-muted-foreground">
-              <span>0</span><span>25</span><span>60</span><span>80</span><span>100</span>
+
+            {/* Visual bar */}
+            <div className="mt-3 flex gap-0.5">
+              {matrix.factors.map((f) => {
+                const fc = RISK_LEVEL_COLORS[f.level];
+                return (
+                  <div key={f.id} className={cn("h-2 flex-1 rounded-full", fc.dot)} />
+                );
+              })}
             </div>
           </div>
 
-          {/* Entity types */}
-          <div className="mt-4">
-            <span className="mb-2 block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">S&apos;applique à</span>
-            <div className="flex flex-wrap gap-1">
-              {matrix.entityTypes.map((t) => (
-                <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-[10px] text-foreground">
-                  {t === "person" ? "Personne" : t === "company" ? "Société" : t === "trust" ? "Trust" : "Fondation"}
-                </span>
-              ))}
+          {/* AMSF reference */}
+          <div className="rounded-md border border-border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                Reference AMSF
+              </span>
             </div>
+            <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">
+              Matrice conforme aux lignes directrices AMSF/SICCFIN relatives a l'evaluation des risques BC/FT.
+              Les 5 facteurs obligatoires sont evalues selon une approche qualitative a 3 niveaux
+              (Loi n° 1.362, Art. 3 et 4).
+            </p>
           </div>
         </div>
       </div>
