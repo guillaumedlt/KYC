@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   User,
@@ -17,6 +18,8 @@ import {
   X,
   Save,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -378,10 +381,20 @@ function RelationsTab({ relations, entityId, allEntities }: Props) {
 function ScreeningTab({ screenings, entityId, entityName, entityType, nationality }: {
   screenings: Screening[]; entityId: string; entityName: string; entityType: string; nationality: string | null;
 }) {
+  const screenRouter = useRouter();
   const [running, setRunning] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
-  const [sourcesChecked, setSourcesChecked] = useState<{ name: string; type: string; url: string; result: string }[]>([]);
-  const [showSources, setShowSources] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(screenings.map((s) => s.id)));
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [localDecisions, setLocalDecisions] = useState<Record<string, string>>({});
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   async function launchScreening() {
     setRunning(true);
@@ -392,19 +405,13 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           entityId,
-          name: entityName,
-          type: entityType === "person" ? "person" : "company",
-          nationality,
-          jurisdiction: entityType !== "person" ? nationality : undefined,
           screeningType: "all",
         }),
       });
       if (!res.ok) throw new Error("Erreur");
       const result = await res.json();
-      setLastResult(result.summary ?? "Screening terminé");
-      if (result.sourcesChecked) setSourcesChecked(result.sourcesChecked);
-      setShowSources(true);
-      setTimeout(() => window.location.reload(), 3000);
+      setLastResult(result.summary ?? "Screening termine");
+      screenRouter.refresh();
     } catch {
       setLastResult("Erreur lors du screening");
     } finally {
@@ -412,11 +419,60 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
     }
   }
 
+  async function submitReview(screeningId: string, decision: string) {
+    setReviewingId(screeningId);
+    try {
+      const res = await fetch("/api/screening", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ screeningId, decision }),
+      });
+      if (!res.ok) throw new Error("Erreur");
+      setLocalDecisions((prev) => ({ ...prev, [screeningId]: decision }));
+      screenRouter.refresh();
+    } catch {
+      // silently fail
+    } finally {
+      setReviewingId(null);
+    }
+  }
+
+  function parseMatchesData(s: Screening) {
+    const raw = s.matches;
+    // New format: { details, sourcesChecked, summary, recommendations }
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const obj = raw as Record<string, unknown>;
+      if (obj.details || obj.sourcesChecked || obj.summary || obj.recommendations) {
+        return {
+          details: (Array.isArray(obj.details) ? obj.details : []) as Record<string, unknown>[],
+          sourcesChecked: (Array.isArray(obj.sourcesChecked) ? obj.sourcesChecked : []) as { name: string; type: string; url: string; result: string }[],
+          summary: typeof obj.summary === "string" ? obj.summary : null,
+          recommendations: (Array.isArray(obj.recommendations) ? obj.recommendations : []) as string[],
+        };
+      }
+    }
+    // Old format: just an array of match objects
+    const arr = Array.isArray(raw) ? raw : [];
+    return {
+      details: arr as Record<string, unknown>[],
+      sourcesChecked: [] as { name: string; type: string; url: string; result: string }[],
+      summary: null as string | null,
+      recommendations: [] as string[],
+    };
+  }
+
   const TYPE_LABELS: Record<string, string> = {
-    pep: "PEP — Personnes Politiquement Exposées",
+    pep: "PEP — Personnes Politiquement Exposees",
     sanctions: "Sanctions internationales (ONU, UE, OFAC, UK HMT, Monaco)",
-    adverse_media: "Adverse Media — Médias défavorables",
+    adverse_media: "Adverse Media — Medias defavorables",
+    all: "Screening complet",
   };
+
+  const REVIEW_BUTTONS: { decision: string; label: string; activeClass: string }[] = [
+    { decision: "confirmed_match", label: "\u2713 Confirmer", activeClass: "bg-red-100 text-red-700 border-red-300" },
+    { decision: "false_positive", label: "\u2717 Faux positif", activeClass: "bg-emerald-100 text-emerald-700 border-emerald-300" },
+    { decision: "pending_review", label: "\u23F3 En attente", activeClass: "bg-amber-100 text-amber-700 border-amber-300" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -435,25 +491,182 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
       {lastResult && (
         <div className="rounded-md bg-muted/30 px-4 py-2 text-[11px] text-foreground">
           <p>{lastResult}</p>
-          {sourcesChecked.length > 0 && (
-            <button onClick={() => setShowSources(!showSources)} className="mt-1 text-[10px] text-muted-foreground underline hover:text-foreground">
-              {showSources ? "Masquer" : "Voir"} les {sourcesChecked.length} sources vérifiées
-            </button>
-          )}
         </div>
       )}
 
-      {showSources && sourcesChecked.length > 0 && (
-        <div className="rounded-md border border-border bg-card">
-          <div className="border-b border-border px-4 py-2">
-            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-              Sources et bases de données vérifiées ({sourcesChecked.length})
-            </span>
-          </div>
+      {screenings.length === 0 ? (
+        <Empty text="Aucun screening effectue" sub="Cliquez sur 'Lancer le screening' pour analyser cette entite" />
+      ) : (
+        <div className="space-y-2">
+          {screenings.map((s) => {
+            const { details, sourcesChecked, summary, recommendations } = parseMatchesData(s);
+            const isExpanded = expandedIds.has(s.id);
+            const currentDecision = localDecisions[s.id] ?? s.review_decision ?? null;
+
+            return (
+              <div key={s.id} className={cn(
+                "rounded-md border",
+                s.match_found ? "border-red-200 bg-red-50/50" : s.status === "processing" ? "border-blue-200 bg-blue-50/50" : "border-emerald-200 bg-emerald-50/50",
+              )}>
+                {/* Header - always visible, clickable to expand */}
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(s.id)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                    {s.match_found ? <AlertTriangle className="h-3.5 w-3.5 text-red-600" /> :
+                     s.status === "processing" ? <Circle className="h-3.5 w-3.5 animate-pulse text-blue-600" /> :
+                     <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />}
+                    <span className="text-[12px] font-medium">
+                      {TYPE_LABELS[s.screening_type] ?? s.screening_type}
+                    </span>
+                    <span className="font-data text-[9px] text-muted-foreground">
+                      {new Date(s.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {currentDecision && (
+                      <span className={cn("rounded px-2 py-0.5 text-[10px] font-medium",
+                        currentDecision === "confirmed_match" ? "bg-red-100 text-red-700" :
+                        currentDecision === "false_positive" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700",
+                      )}>
+                        {currentDecision === "confirmed_match" ? "Match confirme" :
+                         currentDecision === "false_positive" ? "Faux positif" : "En attente"}
+                      </span>
+                    )}
+                    <span className={cn(
+                      "rounded px-2 py-0.5 text-[10px] font-medium",
+                      s.match_found ? "bg-red-100 text-red-700" :
+                      s.status === "processing" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700",
+                    )}>
+                      {s.match_found ? "MATCH DETECTE" : s.status === "processing" ? "En cours" : "Aucun match"}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Expanded content */}
+                {isExpanded && (
+                  <div className="border-t border-border/50 px-4 py-3 space-y-3">
+                    {/* Summary */}
+                    {summary && (
+                      <div className="rounded-md bg-muted/30 px-3 py-2">
+                        <p className="text-[11px] text-foreground">{summary}</p>
+                      </div>
+                    )}
+
+                    {/* Lists checked */}
+                    {s.lists_checked.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {s.lists_checked.map((l) => (
+                          <span key={l} className="rounded bg-background px-1.5 py-0.5 font-data text-[9px] text-muted-foreground">{l.toUpperCase()}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Match details */}
+                    {details.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                          Details des correspondances ({details.length})
+                        </p>
+                        {details.map((m, mi) => (
+                          <div key={mi} className="rounded bg-white/80 px-3 py-2 border border-red-100">
+                            <p className="text-[11px] font-medium text-foreground">
+                              {String(m.name ?? m.title ?? m.function ?? "")}
+                            </p>
+                            {String(m.summary ?? "") !== "" && <p className="mt-0.5 text-[10px] text-muted-foreground">{String(m.summary)}</p>}
+                            <div className="mt-0.5 flex flex-wrap gap-1.5">
+                              {String(m.level ?? "") !== "" && <span className="text-[9px] text-red-600">Niveau : {String(m.level)}</span>}
+                              {String(m.country ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Pays : {String(m.country)}</span>}
+                              {m.confidence != null && <span className="font-data text-[9px] text-muted-foreground">Confiance : {String(m.confidence)}%</span>}
+                              {String(m.list ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Liste : {String(m.list)}</span>}
+                              {String(m.source ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Source : {String(m.source)}</span>}
+                              {String(m.date ?? "") !== "" && <span className="font-data text-[9px] text-muted-foreground">{String(m.date)}</span>}
+                              {m.relevance != null && <span className="font-data text-[9px] text-muted-foreground">Pertinence : {String(m.relevance)}%</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Recommendations */}
+                    {recommendations.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                          Recommandations
+                        </p>
+                        <ul className="space-y-0.5">
+                          {recommendations.map((rec, ri) => (
+                            <li key={ri} className="text-[10px] text-foreground flex items-start gap-1.5">
+                              <span className="mt-1 h-1 w-1 rounded-full bg-indigo-500 shrink-0" />
+                              {rec}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Sources checked - expandable */}
+                    {sourcesChecked.length > 0 && (
+                      <SourcesList sources={sourcesChecked} />
+                    )}
+
+                    {/* Manual review buttons */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-[10px] text-muted-foreground mr-1">Revue :</span>
+                      {REVIEW_BUTTONS.map((btn) => {
+                        const isActive = currentDecision === btn.decision;
+                        return (
+                          <button
+                            key={btn.decision}
+                            type="button"
+                            disabled={isActive || reviewingId === s.id}
+                            onClick={() => submitReview(s.id, btn.decision)}
+                            className={cn(
+                              "rounded border px-2 py-0.5 text-[10px] font-medium transition-colors",
+                              isActive
+                                ? btn.activeClass
+                                : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                              (isActive || reviewingId === s.id) && "opacity-60 cursor-not-allowed",
+                            )}
+                          >
+                            {reviewingId === s.id ? <Loader2 className="inline h-3 w-3 animate-spin mr-1" /> : null}
+                            {btn.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SourcesList({ sources }: { sources: { name: string; type: string; url: string; result: string }[] }) {
+  const [showSources, setShowSources] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setShowSources(!showSources)}
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+      >
+        {showSources ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        Sources verifiees ({sources.length})
+      </button>
+      {showSources && (
+        <div className="mt-1.5 rounded-md border border-border bg-card">
           <div className="divide-y divide-border/50">
-            {sourcesChecked.map((src, i) => {
+            {sources.map((src, i) => {
               const isMatch = src.result.toLowerCase().includes("match") && !src.result.toLowerCase().includes("aucun");
-              const isClean = src.result.toLowerCase().includes("aucun") || src.result.toLowerCase().includes("no match") || src.result.toLowerCase().includes("négatif");
+              const isClean = src.result.toLowerCase().includes("aucun") || src.result.toLowerCase().includes("no match") || src.result.toLowerCase().includes("negatif");
               return (
                 <div key={i} className="flex items-center justify-between px-4 py-1.5">
                   <div className="flex items-center gap-2 min-w-0">
@@ -467,7 +680,7 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
                           {src.name}
                         </a>
                         <span className="shrink-0 rounded bg-muted px-1 py-px text-[8px] text-muted-foreground">
-                          {src.type === "pep_database" ? "PEP" : src.type === "sanctions_list" ? "Sanctions" : src.type === "media" ? "Média" : src.type === "registry" ? "Registre" : src.type === "fatf" ? "GAFI" : "Autre"}
+                          {src.type === "pep_database" ? "PEP" : src.type === "sanctions_list" ? "Sanctions" : src.type === "media" ? "Media" : src.type === "registry" ? "Registre" : src.type === "fatf" ? "GAFI" : "Autre"}
                         </span>
                       </div>
                       <a href={src.url} target="_blank" rel="noopener noreferrer"
@@ -485,92 +698,6 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
               );
             })}
           </div>
-        </div>
-      )}
-
-      {screenings.length === 0 ? (
-        <Empty text="Aucun screening effectué" sub="Cliquez sur 'Lancer le screening' pour analyser cette entité" />
-      ) : (
-        <div className="space-y-2">
-          {screenings.map((s) => {
-            const matches = (Array.isArray(s.matches) ? s.matches : []) as Record<string, unknown>[];
-            const firstMatch = matches[0];
-            return (
-              <div key={s.id} className={cn(
-                "rounded-md border px-4 py-3",
-                s.match_found ? "border-red-200 bg-red-50/50" : s.status === "processing" ? "border-blue-200 bg-blue-50/50" : "border-emerald-200 bg-emerald-50/50",
-              )}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {s.match_found ? <AlertTriangle className="h-3.5 w-3.5 text-red-600" /> :
-                     s.status === "processing" ? <Circle className="h-3.5 w-3.5 animate-pulse text-blue-600" /> :
-                     <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />}
-                    <span className="text-[12px] font-medium">
-                      {TYPE_LABELS[s.screening_type] ?? s.screening_type}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "rounded px-2 py-0.5 text-[10px] font-medium",
-                      s.match_found ? "bg-red-100 text-red-700" :
-                      s.status === "processing" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700",
-                    )}>
-                      {s.match_found ? "MATCH DÉTECTÉ" : s.status === "processing" ? "En cours" : "Aucun match"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Lists checked */}
-                {s.lists_checked.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {s.lists_checked.map((l) => (
-                      <span key={l} className="rounded bg-background px-1.5 py-0.5 font-data text-[9px] text-muted-foreground">{l.toUpperCase()}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Match details */}
-                {s.match_found && matches.length > 0 && (
-                  <div className="mt-2 space-y-1.5">
-                    {matches.map((m, mi) => (
-                      <div key={mi} className="rounded bg-white/80 px-3 py-2 border border-red-100">
-                        <p className="text-[11px] font-medium text-foreground">
-                          {String(m.name ?? m.title ?? m.function ?? "")}
-                        </p>
-                        {String(m.summary ?? "") !== "" && <p className="mt-0.5 text-[10px] text-muted-foreground">{String(m.summary)}</p>}
-                        <div className="mt-0.5 flex flex-wrap gap-1.5">
-                          {String(m.level ?? "") !== "" && <span className="text-[9px] text-red-600">Niveau : {String(m.level)}</span>}
-                          {String(m.country ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Pays : {String(m.country)}</span>}
-                          {String(m.list ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Liste : {String(m.list)}</span>}
-                          {String(m.source ?? "") !== "" && <span className="text-[9px] text-muted-foreground">Source : {String(m.source)}</span>}
-                          {String(m.date ?? "") !== "" && <span className="font-data text-[9px] text-muted-foreground">{String(m.date)}</span>}
-                          {m.confidence != null && <span className="font-data text-[9px] text-muted-foreground">Confiance : {String(m.confidence)}%</span>}
-                          {m.relevance != null && <span className="font-data text-[9px] text-muted-foreground">Pertinence : {String(m.relevance)}%</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Review status */}
-                {s.review_decision && (
-                  <div className="mt-2">
-                    <span className={cn("rounded px-2 py-0.5 text-[10px] font-medium",
-                      s.review_decision === "confirmed_match" ? "bg-red-100 text-red-700" :
-                      s.review_decision === "false_positive" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700",
-                    )}>
-                      {s.review_decision === "confirmed_match" ? "Match confirmé" :
-                       s.review_decision === "false_positive" ? "Faux positif" : "En attente de revue"}
-                    </span>
-                  </div>
-                )}
-
-                <p className="mt-2 font-data text-[9px] text-muted-foreground">
-                  {new Date(s.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                </p>
-              </div>
-            );
-          })}
         </div>
       )}
     </div>
