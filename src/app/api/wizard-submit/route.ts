@@ -49,6 +49,21 @@ export async function POST(request: NextRequest) {
       ? `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim()
       : data.companyName ?? "Sans nom";
 
+    // 0. Ensure user exists in users table
+    const { data: existingUser } = await supabase.from("users").select("id").eq("id", user.id).single();
+    let userId: string | null = existingUser?.id ?? null;
+    if (!userId) {
+      // Create user record from auth user
+      const { data: newUser } = await supabase.from("users").insert({
+        id: user.id,
+        tenant_id: TENANT_ID,
+        email: user.email ?? "",
+        full_name: user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Utilisateur",
+        role: "admin",
+      }).select("id").single();
+      userId = newUser?.id ?? null;
+    }
+
     // 1. Create entity
     const { data: entity, error: entityErr } = await supabase
       .from("entities")
@@ -62,7 +77,7 @@ export async function POST(request: NextRequest) {
           ? data.riskScore >= 80 ? "critical" : data.riskScore >= 60 ? "high" : data.riskScore >= 40 ? "medium" : "low"
           : null,
         source: "manual",
-        created_by: user.id,
+        created_by: userId,
       })
       .select("id")
       .single();
@@ -136,7 +151,7 @@ export async function POST(request: NextRequest) {
       case_number: caseNumber,
       vigilance_level: vigilance,
       status: "screening",
-      created_by: user.id,
+      created_by: userId,
       due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
     });
 
@@ -175,7 +190,7 @@ export async function POST(request: NextRequest) {
       type: "entity_created",
       title: "Entité créée via le parcours KYC",
       description: `${displayName} — parcours ${isPerson ? "personne physique" : "société"} complété`,
-      created_by: user.id,
+      created_by: userId,
       agent_id: "kyc-wizard",
     });
 
