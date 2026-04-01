@@ -382,12 +382,20 @@ RÈGLES IMPORTANTES :
    Rôles Luxembourg : "Gérant", "Administrateur", "Commissaire"
    → Ne PAS simplifier le rôle. Si le document dit "Administrateur Délégué", ne mets pas juste "Administrateur".
 
-4. ACTIONNAIRES : Extrais avec le pourcentage et le type (personne physique ou morale).
+4. ACTIONNAIRES ET STRUCTURES COMPLEXES :
+   - Extrais CHAQUE actionnaire avec son pourcentage et son type (personne physique ou morale).
+   - Si un actionnaire est une SOCIÉTÉ (holding, SPV, etc.) : indique type="company" et le nom exact de la société.
+   - Structures en cascade : Si Société A détient Société B qui détient la cible, extrais chaque niveau visible dans le document.
+   - Holdings : Si le document mentionne une holding qui détient X%, note-la comme actionnaire type="company".
+   - Trusts : Si un trust est actionnaire, note-le avec type="company" et précise "(Trust)" dans le nom.
+   - Actions au porteur : Ajoute un warning "Actions au porteur détectées — identification UBO requise".
+   - Nominee shareholders : Ajoute un warning "Actionnaire nominee détecté — identifier le bénéficiaire réel".
+   - Si la chaîne de détention est complexe ou opaque, ajoute un warning "Structure de détention complexe — investigation complémentaire requise".
 
 5. NE PAS extraire la date d'immatriculation.
 
 6. MULTI-LANGUE : Le document peut être en n'importe quelle langue. Translittère les noms en caractères latins si nécessaire.`,
-    `Extrais toutes les informations de ce document de société. Attention aux rôles exacts des personnes (Administrateur Délégué, Gérant, etc.) et au siège social.`,
+    `Extrais toutes les informations de ce document de société. Attention aux rôles exacts des personnes (Administrateur Délégué, Gérant, etc.), au siège social, et aux structures d'actionnariat complexes (holdings, sociétés en cascade, trusts).`,
     imageBase64,
   );
 
