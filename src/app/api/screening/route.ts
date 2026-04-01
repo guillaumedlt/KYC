@@ -150,8 +150,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Save screenings to DB
+    // Save screenings to DB — REPLACE existing ones (don't accumulate)
     for (const screening of screeningsToSave) {
+      // Delete previous screening of same type for same entity
+      await supabase.from("screenings")
+        .delete()
+        .eq("entity_id", screening.entity_id)
+        .eq("screening_type", screening.screening_type);
+
+      // Insert new one
       await supabase.from("screenings").insert(screening);
     }
 

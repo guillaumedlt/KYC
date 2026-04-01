@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -59,7 +59,20 @@ interface Props {
 export function DossierTabs(props: Props) {
   const isCompany = props.entityType !== "person";
   const tabs = isCompany ? COMPANY_TABS : PERSON_TABS;
-  const [activeTab, setActiveTab] = useState<string>("synthese");
+  const tabKeys = tabs.map((t) => t.key) as string[];
+
+  // Persist active tab in URL hash so it survives page reload
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash.slice(1);
+      if (hash && tabKeys.includes(hash)) return hash;
+    }
+    return "synthese";
+  });
+
+  useEffect(() => {
+    window.location.hash = activeTab;
+  }, [activeTab]);
 
   return (
     <div>

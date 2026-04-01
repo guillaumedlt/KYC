@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Search, CheckCircle, AlertTriangle, Clock, ChevronDown, ChevronRight, ExternalLink, Shield, Globe, Newspaper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ interface Props {
 }
 
 export function ScreeningTab({ screenings, relations, entityId, entity }: Props) {
+  const router = useRouter();
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<Record<string, ScreeningResult>>({});
   const [expandedScreenings, setExpandedScreenings] = useState<Record<string, boolean>>({});
@@ -457,6 +459,7 @@ function ReviewButton({ screeningId, currentDecision, decision, label }: {
   screeningId: string; currentDecision: string | null; decision: string; label: string;
 }) {
   const [loading, setLoading] = useState(false);
+  const reviewRouter = useRouter();
   const isActive = currentDecision === decision;
 
   async function handleClick(e: React.MouseEvent) {
@@ -469,7 +472,7 @@ function ReviewButton({ screeningId, currentDecision, decision, label }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ screeningId, decision }),
       });
-      window.location.reload();
+      reviewRouter.refresh();
     } catch {
       // Error
     } finally {
