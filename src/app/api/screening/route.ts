@@ -13,22 +13,66 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const body = await request.json();
-    const { entityId, name, type, nationality, dateOfBirth, jurisdiction, role, screeningType } = body;
+    const { entityId, screeningType } = body;
 
-    if (!name || !entityId) {
-      return NextResponse.json({ error: "Missing name or entityId" }, { status: 400 });
+    if (!entityId) {
+      return NextResponse.json({ error: "Missing entityId" }, { status: 400 });
     }
 
-    console.log(`[Screening] Starting ${screeningType ?? "full"} screening for: ${name}`);
+    // Fetch FULL entity context from DB — everything we know
+    const { data: entity } = await supabase.from("entities").select("*").eq("id", entityId).single();
+    if (!entity) return NextResponse.json({ error: "Entity not found" }, { status: 404 });
 
-    // Run AI screening
+    const isPerson = entity.type === "person";
+    let person: Record<string, unknown> | null = null;
+    let company: Record<string, unknown> | null = null;
+
+    if (isPerson) {
+      const { data } = await supabase.from("entity_people").select("*").eq("entity_id", entityId).single();
+      person = data;
+    } else {
+      const { data } = await supabase.from("entity_companies").select("*").eq("entity_id", entityId).single();
+      company = data;
+    }
+
+    // Get relations (UBOs, directors, shareholders)
+    const { data: relations } = await supabase
+      .from("entity_relations")
+      .select("*, from_entity:entities!entity_relations_from_entity_id_fkey(display_name, type), to_entity:entities!entity_relations_to_entity_id_fkey(display_name, type)")
+      .or(`from_entity_id.eq.${entityId},to_entity_id.eq.${entityId}`);
+
+    // Get existing documents
+    const { data: documents } = await supabase
+      .from("documents")
+      .select("name, type, status")
+      .eq("entity_id", entityId);
+
+    // Build full context
+    const name = entity.display_name;
+    const type = isPerson ? "person" as const : "company" as const;
+    const nationality = isPerson ? (person?.nationality as string ?? null) : null;
+    const dateOfBirth = isPerson ? (person?.date_of_birth as string ?? null) : null;
+    const jurisdiction = !isPerson ? (company?.jurisdiction as string ?? null) : null;
+    const address = isPerson ? (person?.address as string ?? null) : null;
+
+    // Build aliases from relations
+    const relatedNames = (relations ?? []).map((r: Record<string, unknown>) => {
+      const from = r.from_entity as Record<string, unknown> | null;
+      const to = r.to_entity as Record<string, unknown> | null;
+      return from?.display_name !== name ? (from?.display_name as string) : (to?.display_name as string);
+    }).filter(Boolean) as string[];
+
+    console.log(`[Screening] Starting full screening for: ${name} (${type}), context: nationality=${nationality}, dob=${dateOfBirth}, jurisdiction=${jurisdiction}, relations=${relatedNames.length}, documents=${(documents ?? []).length}`);
+
+    // Run AI screening with FULL context
     const result = await screenEntity({
       name,
-      type: type ?? "person",
+      type,
       nationality,
       dateOfBirth,
       jurisdiction,
-      role,
+      role: isPerson ? (person?.is_pep ? "PEP signalé" : null) : null,
+      aliases: relatedNames.length > 0 ? relatedNames : undefined,
     });
 
     // Determine which screenings to save

@@ -86,7 +86,19 @@ export function CompanyDocsStep({ data, update, next, back }: {
       const res = await fetch("/api/ai-extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "company", base64, mediaType: file.type, docType }),
+        body: JSON.stringify({
+          action: "company", base64, mediaType: file.type, docType,
+          clientContext: {
+            companyName: data.companyName,
+            regNumber: data.regNumber,
+            jurisdiction: data.jurisdiction,
+            companyType: data.companyType,
+            capital: data.capital,
+            industry: data.industry,
+            registeredAddress: data.aiExtractions.registered_address ?? "",
+            personsKnown: data.ubos.map((u) => `${u.name} (${u.role ?? ""})`).join(", "),
+          },
+        }),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

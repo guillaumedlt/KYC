@@ -56,7 +56,41 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 1. Run AI extraction
+      // 0. Build FULL context from DB — everything we know about this entity
+      const { data: entity } = await supabase.from("entities").select("*").eq("id", entityId).single();
+      const isPerson = entity?.type === "person";
+
+      let fullContext: Record<string, string> = {};
+      if (isPerson) {
+        const { data: person } = await supabase.from("entity_people").select("*").eq("entity_id", entityId).single();
+        if (person) {
+          fullContext = {
+            firstName: (person.first_name as string) ?? "",
+            lastName: (person.last_name as string) ?? "",
+            nationality: (person.nationality as string) ?? "",
+            dateOfBirth: (person.date_of_birth as string) ?? "",
+            address: (person.address as string) ?? "",
+            documentNumber: "",
+          };
+        }
+      } else {
+        const { data: company } = await supabase.from("entity_companies").select("*").eq("entity_id", entityId).single();
+        if (company) {
+          fullContext = {
+            companyName: (company.legal_name as string) ?? "",
+            jurisdiction: (company.jurisdiction as string) ?? "",
+            registrationNumber: (company.registration_number as string) ?? "",
+            companyType: (company.company_type as string) ?? "",
+          };
+        }
+      }
+
+      // Merge with any clientContext passed from frontend
+      const mergedContext = { ...fullContext, ...clientContext };
+
+      console.log(`[entity-update] Extracting ${docType} for ${entity?.display_name ?? entityId}, context keys: ${Object.keys(mergedContext).join(", ")}`);
+
+      // 1. Run AI extraction with full context
       let extracted: Record<string, unknown>;
 
       switch (docType) {
@@ -64,13 +98,13 @@ export async function POST(request: NextRequest) {
           extracted = await extractIdentity(base64, mediaType);
           break;
         case "address":
-          extracted = await extractAddress(base64, mediaType, clientContext);
+          extracted = await extractAddress(base64, mediaType, mergedContext);
           break;
         case "funds":
-          extracted = await extractFundsSource(base64, mediaType, clientContext);
+          extracted = await extractFundsSource(base64, mediaType, mergedContext);
           break;
         case "company":
-          extracted = await extractCompanyDocument(base64, "registration");
+          extracted = await extractCompanyDocument(base64, "registration", mergedContext);
           break;
         default:
           return NextResponse.json(

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
         break;
       case "company":
         if (!base64) return NextResponse.json({ error: "Missing base64" }, { status: 400 });
-        result = await extractCompanyDocument(base64, docType ?? "registration");
+        result = await extractCompanyDocument(base64, docType ?? "registration", clientContext);
         break;
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });

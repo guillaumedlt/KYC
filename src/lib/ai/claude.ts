@@ -374,7 +374,7 @@ Warnings automatiques :
 // COMPANY EXTRACTION — Opus (best accuracy, all languages)
 // =============================================================================
 
-export async function extractCompanyDocument(imageBase64: string, docType: string): Promise<{
+export async function extractCompanyDocument(imageBase64: string, docType: string, companyContext?: Record<string, string>): Promise<{
   companyName: string | null;
   registrationNumber: string | null;
   jurisdiction: string | null;
@@ -394,6 +394,23 @@ export async function extractCompanyDocument(imageBase64: string, docType: strin
     `Tu es un expert compliance spécialisé dans l'extraction de documents de société et l'analyse de structures capitalistiques complexes.
 
 DOCUMENT : ${docType}
+${companyContext ? `
+CONTEXTE DÉJÀ CONNU (documents précédents analysés) :
+${companyContext.companyName ? `- Raison sociale : ${companyContext.companyName}` : ""}
+${companyContext.regNumber ? `- N° registre : ${companyContext.regNumber}` : ""}
+${companyContext.jurisdiction ? `- Juridiction : ${companyContext.jurisdiction}` : ""}
+${companyContext.companyType ? `- Forme juridique : ${companyContext.companyType}` : ""}
+${companyContext.capital ? `- Capital : ${companyContext.capital}` : ""}
+${companyContext.industry ? `- Activité : ${companyContext.industry}` : ""}
+${companyContext.registeredAddress ? `- Siège social : ${companyContext.registeredAddress}` : ""}
+${companyContext.personsKnown ? `- Personnes déjà identifiées : ${companyContext.personsKnown}` : ""}
+
+UTILISE ce contexte pour :
+1. Vérifier la cohérence des nouvelles données avec les précédentes
+2. Ne PAS ré-extraire des champs déjà connus sauf si le nouveau document apporte une correction
+3. Pour un organigramme/actionnariat : croiser avec les personnes déjà identifiées
+4. Signaler toute incohérence entre ce document et les données précédentes
+` : ""}
 
 Réponds UNIQUEMENT en JSON :
 {
