@@ -383,7 +383,8 @@ export async function extractCompanyDocument(imageBase64: string, docType: strin
   registeredAddress: string | null;
   businessObject: string | null;
   persons: { name: string; role: string; nationality?: string }[];
-  shareholders: { name: string; percentage: number; type: string; jurisdiction?: string; registrationNumber?: string; heldThrough?: string; subsidiaries?: { name: string; percentage: number; type: string }[] }[];
+  shareholders: { name: string; percentage: number; type: string; jurisdiction?: string; registrationNumber?: string; heldThrough?: string; holdingType?: string; subsidiaries?: { name: string; percentage: number; type: string }[] }[];
+  beneficialOwners: { name: string; effectivePercentage: number; detentionType: string; chain: string; isUBO: boolean; nationality?: string }[];
   ownershipChain: string | null;
   confidence: number;
   warnings: string[];
@@ -411,15 +412,26 @@ Réponds UNIQUEMENT en JSON :
       "name": "Nom actionnaire",
       "percentage": 65,
       "type": "person|company|trust|foundation",
-      "jurisdiction": "XX si société étrangère",
-      "registrationNumber": "numéro si visible",
-      "heldThrough": "nom de l'intermédiaire si détention indirecte",
+      "jurisdiction": "XX",
+      "registrationNumber": "si visible",
+      "heldThrough": "intermédiaire si indirect",
+      "holdingType": "direct|indirect|mixed",
       "subsidiaries": [
-        {"name": "sous-actionnaire si visible", "percentage": 100, "type": "person|company"}
+        {"name": "sous-actionnaire", "percentage": 100, "type": "person|company"}
       ]
     }
   ],
-  "ownershipChain": "Description textuelle de la chaîne de détention si complexe. Ex: 'M. Dupont (100%) → Holding Alpha SA (65%) → Société Cible SAM'",
+  "beneficialOwners": [
+    {
+      "name": "Personne physique bénéficiaire effectif",
+      "effectivePercentage": 65.0,
+      "detentionType": "direct|indirect|mixed",
+      "chain": "M. Dupont → Holding Alpha SA (100%) → Société Cible (65%) = 65% effectif",
+      "isUBO": true,
+      "nationality": "XX"
+    }
+  ],
+  "ownershipChain": "Schéma global : M. Dupont (100%) → Holding Alpha [LU] (65%) → Société Cible",
   "confidence": 0-100,
   "warnings": []
 }
@@ -445,15 +457,36 @@ RÈGLES ACTIONNARIAT — C'EST CRITIQUE :
    Exemple : M. X détient 30% via SCI Patrimoine
    → {"name": "M. X", "percentage": 30, "type": "person", "heldThrough": "SCI Patrimoine"}
 
-5. CAS SPÉCIAUX — ajouter un warning :
-   - Actions au porteur → "Actions au porteur détectées — UBO non identifiable"
+5. CALCUL DES BÉNÉFICIAIRES EFFECTIFS (Art. 4-2 Loi 1.362, seuil ≥25%) :
+   Pour chaque PERSONNE PHYSIQUE identifiable dans la chaîne de détention, calcule le % EFFECTIF :
+
+   a) DÉTENTION DIRECTE : M. X détient 30% de la cible → effectivePercentage = 30%, detentionType = "direct"
+
+   b) DÉTENTION INDIRECTE : M. X (100%) → Holding A (65%) → Cible
+      effectivePercentage = 100% × 65% = 65%, detentionType = "indirect"
+      chain = "M. X (100%) → Holding A (65%) → Cible = 65% effectif"
+
+   c) DÉTENTION MIXTE : M. X détient 10% en direct + 100% de Holding A qui détient 40%
+      effectivePercentage = 10% + (100% × 40%) = 50%, detentionType = "mixed"
+
+   d) CHAÎNE MULTI-NIVEAUX : M. X (80%) → Holding A (60%) → Holding B (50%) → Cible
+      effectivePercentage = 80% × 60% × 50% = 24%, detentionType = "indirect"
+
+   isUBO = true si effectivePercentage ≥ 25%
+
+   IMPORTANT : Les bénéficiaires effectifs sont TOUJOURS des personnes physiques, jamais des sociétés.
+   Si une société est actionnaire mais qu'on ne connaît pas ses propres actionnaires, ajouter un warning.
+
+6. CAS SPÉCIAUX — ajouter un warning :
+   - Actions au porteur → "Actions au porteur — UBO non identifiable sans investigation"
    - Nominee/prête-nom → "Actionnaire nominee — identifier le bénéficiaire réel"
    - Trust opaque → "Trust sans bénéficiaire identifié — investigation requise"
-   - Juridiction à risque → "Actionnaire dans une juridiction à risque (XXX)"
-   - % qui ne totalisent pas 100% → "Total actionnariat = XX% — parts manquantes"
-   - Démembrement (usufruit/nue-propriété) → "Démembrement de propriété détecté"
+   - Juridiction à risque → "Actionnaire dans juridiction à risque (XXX)"
+   - % ne totalisent pas 100% → "Total actionnariat = XX% — parts manquantes"
+   - Démembrement → "Démembrement de propriété détecté — nu-propriétaire ET usufruitier sont UBO"
+   - Aucun UBO ≥25% identifiable → "Aucun UBO ≥25% — identifier le dirigeant principal comme UBO par défaut"
 
-6. PERSONNES — rôle EXACT tel que sur le document (Administrateur Délégué, pas Administrateur).
+7. PERSONNES — rôle EXACT tel que sur le document (Administrateur Délégué, pas Administrateur).
 
 7. SIÈGE SOCIAL — adresse complète.
 
@@ -467,7 +500,7 @@ RÈGLES ACTIONNARIAT — C'EST CRITIQUE :
   try {
     return JSON.parse(result.text);
   } catch {
-    return { companyName: null, registrationNumber: null, jurisdiction: null, companyType: null, capital: null, registeredAddress: null, businessObject: null, persons: [], shareholders: [], ownershipChain: null, confidence: 0, warnings: ["Extraction échouée"] };
+    return { companyName: null, registrationNumber: null, jurisdiction: null, companyType: null, capital: null, registeredAddress: null, businessObject: null, persons: [], shareholders: [], beneficialOwners: [], ownershipChain: null, confidence: 0, warnings: ["Extraction échouée"] };
   }
 }
 

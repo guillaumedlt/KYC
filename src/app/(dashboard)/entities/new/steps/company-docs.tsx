@@ -362,6 +362,62 @@ export function CompanyDocsStep({ data, update, next, back }: {
                               </div>
                             )}
 
+                            {/* Beneficial Owners (UBO) */}
+                            {(() => {
+                              const ubos = Array.isArray(r.beneficialOwners) ? r.beneficialOwners as { name: string; effectivePercentage: number; detentionType: string; chain: string; isUBO: boolean; nationality?: string }[] : [];
+                              if (ubos.length === 0) return null;
+                              const confirmedUBOs = ubos.filter((u) => u.isUBO);
+                              return (
+                                <div>
+                                  <p className="mb-1 text-[9px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                    Bénéficiaires effectifs (Art. 4-2 Loi 1.362 — seuil ≥25%)
+                                  </p>
+                                  <div className="space-y-1.5">
+                                    {ubos.map((u, ui) => (
+                                      <div key={ui} className={cn("rounded px-2.5 py-1.5", u.isUBO ? "bg-foreground/5 border border-foreground/10" : "bg-background")}>
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5">
+                                            {u.isUBO ? (
+                                              <span className="rounded bg-foreground px-1 py-px text-[8px] font-bold text-background">UBO</span>
+                                            ) : (
+                                              <span className="rounded bg-muted px-1 py-px text-[8px] text-muted-foreground">&lt;25%</span>
+                                            )}
+                                            <span className={cn("text-[11px]", u.isUBO ? "font-medium text-foreground" : "text-muted-foreground")}>{u.name}</span>
+                                            {u.nationality && <span className="text-[9px] text-muted-foreground">{String(u.nationality)}</span>}
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className={cn("rounded px-1.5 py-px text-[9px]",
+                                              u.detentionType === "direct" ? "bg-emerald-50 text-emerald-700" :
+                                              u.detentionType === "indirect" ? "bg-amber-50 text-amber-700" :
+                                              "bg-blue-50 text-blue-700"
+                                            )}>
+                                              {u.detentionType === "direct" ? "Direct" : u.detentionType === "indirect" ? "Indirect" : "Mixte"}
+                                            </span>
+                                            <span className={cn("font-data text-[12px] font-semibold", u.isUBO ? "text-foreground" : "text-muted-foreground")}>
+                                              {u.effectivePercentage.toFixed(1)}%
+                                            </span>
+                                          </div>
+                                        </div>
+                                        {u.chain && (
+                                          <p className="mt-0.5 font-data text-[9px] text-muted-foreground leading-relaxed">{u.chain}</p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {confirmedUBOs.length > 0 && (
+                                    <p className="mt-1.5 text-[9px] text-emerald-600 font-medium">
+                                      {confirmedUBOs.length} bénéficiaire(s) effectif(s) identifié(s) (≥25%)
+                                    </p>
+                                  )}
+                                  {confirmedUBOs.length === 0 && (
+                                    <p className="mt-1.5 text-[9px] text-amber-600 font-medium">
+                                      Aucun UBO ≥25% identifié — le dirigeant principal doit être désigné comme UBO par défaut
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
                             {warnings.length > 0 && (
                               <div className="space-y-0.5">
                                 {warnings.map((w, wi) => (
