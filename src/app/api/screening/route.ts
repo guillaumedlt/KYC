@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { screenEntity } from "@/lib/ai/claude";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServerClient } from "@supabase/supabase-js";
 
 export const maxDuration = 60;
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
+function getSupabase() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    const supabase = getSupabase();
 
     const body = await request.json();
     const { entityId, screeningType } = body;
@@ -257,9 +262,7 @@ export async function POST(request: NextRequest) {
 // PATCH — Manual review of a screening
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    const supabase = getSupabase();
 
     const body = await request.json();
     const { screeningId, decision } = body;
@@ -272,15 +275,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid decision" }, { status: 400 });
     }
 
-    // Get user ID from users table
-    const { data: existingUser } = await supabase.from("users").select("id").eq("id", user.id).single();
-    const userId = existingUser?.id ?? null;
-
     const { error } = await supabase
       .from("screenings")
       .update({
         review_decision: decision,
-        reviewed_by: userId,
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", screeningId);
@@ -295,8 +293,7 @@ export async function PATCH(request: NextRequest) {
         entity_id: screening.entity_id,
         type: "screening_reviewed",
         title: `Screening ${screening.screening_type} revu — ${decision === "confirmed_match" ? "Match confirmé" : decision === "false_positive" ? "Faux positif" : "En attente"}`,
-        description: `Revue manuelle par ${user.email} sur ${(screening.entities as Record<string, unknown>)?.display_name ?? screening.entity_id}`,
-        created_by: userId,
+        description: `Revue manuelle sur ${(screening.entities as Record<string, unknown>)?.display_name ?? screening.entity_id}`,
       });
     }
 
