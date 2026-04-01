@@ -78,11 +78,59 @@ export async function POST(request: NextRequest) {
     // Determine which screenings to save
     const screeningsToSave = [];
 
-    // Build full result payload for each screening type — includes sources, summary, etc.
+    // Generate DIRECT SEARCH URLs with entity name (not just homepage)
+    const searchName = encodeURIComponent(name);
+    const directSearchLinks: { name: string; type: string; url: string; searchUrl: string; result: string }[] = [
+      // PEP databases
+      { name: "Google — recherche PEP", type: "pep_database", url: "https://www.google.com", searchUrl: `https://www.google.com/search?q="${searchName}"+PEP+politically+exposed+person`, result: "" },
+      { name: "HATVP France — déclarations", type: "pep_database", url: "https://www.hatvp.fr", searchUrl: `https://www.hatvp.fr/consulter-les-declarations/?search=${searchName}`, result: "" },
+      { name: "OpenSanctions — PEP/Sanctions", type: "pep_database", url: "https://www.opensanctions.org", searchUrl: `https://www.opensanctions.org/search/?q=${searchName}`, result: "" },
+      // Sanctions lists
+      { name: "ONU — Liste consolidée sanctions", type: "sanctions_list", url: "https://www.un.org", searchUrl: `https://www.un.org/securitycouncil/content/un-sc-consolidated-list`, result: "" },
+      { name: "UE — Carte des sanctions", type: "sanctions_list", url: "https://www.sanctionsmap.eu", searchUrl: `https://www.sanctionsmap.eu/#/main?search=%7B%22value%22:%22${searchName}%22%7D`, result: "" },
+      { name: "OFAC — SDN Search (US)", type: "sanctions_list", url: "https://sanctionssearch.ofac.treas.gov", searchUrl: `https://sanctionssearch.ofac.treas.gov/Details.aspx?id=${searchName}`, result: "" },
+      { name: "UK — HMT Sanctions Search", type: "sanctions_list", url: "https://www.gov.uk", searchUrl: `https://www.gov.uk/government/publications/the-uk-sanctions-list`, result: "" },
+      { name: "Monaco — Gel des fonds", type: "sanctions_list", url: "https://service-public-entreprises.gouv.mc", searchUrl: `https://service-public-entreprises.gouv.mc/En-cours-d-activite/Obligations-legales-et-comptables/Mesures-de-gel-de-fonds/Liste-nationale-de-gel-des-fonds-et-des-ressources-economiques`, result: "" },
+      // Registries
+      { name: "OpenCorporates — recherche société", type: "registry", url: "https://opencorporates.com", searchUrl: `https://opencorporates.com/companies?q=${searchName}`, result: "" },
+      { name: "ICIJ — Offshore Leaks Database", type: "media", url: "https://offshoreleaks.icij.org", searchUrl: `https://offshoreleaks.icij.org/search?q=${searchName}`, result: "" },
+      // Media
+      { name: "Google News — médias", type: "media", url: "https://news.google.com", searchUrl: `https://news.google.com/search?q="${searchName}"+fraude+OR+blanchiment+OR+corruption+OR+sanctions`, result: "" },
+      { name: "Google — adverse media", type: "media", url: "https://www.google.com", searchUrl: `https://www.google.com/search?q="${searchName}"+fraud+OR+money+laundering+OR+corruption+OR+sanctions+OR+criminal`, result: "" },
+      // FATF
+      { name: "GAFI — Juridictions à haut risque", type: "fatf", url: "https://www.fatf-gafi.org", searchUrl: `https://www.fatf-gafi.org/en/countries/detail/${nationality?.toLowerCase() ?? "monaco"}.html`, result: "" },
+      { name: "Transparency International — CPI", type: "media", url: "https://www.transparency.org", searchUrl: `https://www.transparency.org/en/cpi/2023`, result: "" },
+    ];
+
+    // Merge AI sources with our generated direct links
+    // AI sources have analysis results, direct links have search URLs
+    const aiSources = result.sourcesChecked ?? [];
+    const mergedSources = directSearchLinks.map((link) => {
+      // Find matching AI source by name similarity
+      const aiMatch = aiSources.find((s: { name: string; result: string }) =>
+        s.name.toLowerCase().includes(link.name.split("—")[0].trim().toLowerCase().slice(0, 10)) ||
+        link.name.toLowerCase().includes(s.name.toLowerCase().slice(0, 10))
+      );
+      return {
+        name: link.name,
+        type: link.type,
+        url: link.searchUrl, // Use the SEARCH URL, not homepage
+        result: aiMatch?.result ?? "Vérification manuelle requise — cliquez pour vérifier",
+      };
+    });
+
+    // Add any AI sources that weren't matched
+    for (const aiSrc of aiSources) {
+      if (!mergedSources.some((m) => m.name.toLowerCase().includes((aiSrc as { name: string }).name.toLowerCase().slice(0, 10)))) {
+        mergedSources.push(aiSrc as { name: string; type: string; url: string; result: string });
+      }
+    }
+
+    // Build full result payload
     const fullPayload = {
       summary: result.summary,
       recommendations: result.recommendations,
-      sourcesChecked: result.sourcesChecked,
+      sourcesChecked: mergedSources,
       countryRisk: result.countryRisk,
       overallRisk: result.overallRisk,
       confidence: result.confidence,
