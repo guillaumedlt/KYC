@@ -295,14 +295,19 @@ export function ScreeningTab({ screenings, relations, entityId, entity }: Props)
                                         const isM = src.result.toLowerCase().includes("match") && !src.result.toLowerCase().includes("aucun");
                                         const isC = src.result.toLowerCase().includes("aucun") || src.result.toLowerCase().includes("négatif");
                                         return (
-                                          <div key={si} className="flex items-center justify-between px-2.5 py-1">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                              <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", isM ? "bg-red-500" : isC ? "bg-emerald-500" : "bg-amber-500")} />
-                                              <a href={src.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-foreground hover:underline flex items-center gap-0.5 truncate">
-                                                {src.name} <ExternalLink className="h-2 w-2 shrink-0 text-muted-foreground" />
-                                              </a>
+                                          <div key={si} className="px-2.5 py-1">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", isM ? "bg-red-500" : isC ? "bg-emerald-500" : "bg-amber-500")} />
+                                                <a href={src.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-foreground hover:underline flex items-center gap-0.5 truncate">
+                                                  {src.name} <ExternalLink className="h-2 w-2 shrink-0 text-muted-foreground" />
+                                                </a>
+                                                {String((src as Record<string, unknown>).screenshotUrl ?? "") !== "" && (
+                                                  <a href={String((src as Record<string, unknown>).screenshotUrl)} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded bg-blue-50 px-1 py-px text-[7px] text-blue-600 hover:bg-blue-100">📷</a>
+                                                )}
+                                              </div>
+                                              <span className={cn("shrink-0 text-[8px] ml-1", isM ? "text-red-600" : isC ? "text-emerald-600" : "text-amber-600")}>{src.result}</span>
                                             </div>
-                                            <span className={cn("shrink-0 text-[8px] ml-1", isM ? "text-red-600" : isC ? "text-emerald-600" : "text-amber-600")}>{src.result}</span>
                                           </div>
                                         );
                                       })}

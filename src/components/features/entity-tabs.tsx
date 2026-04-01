@@ -649,8 +649,9 @@ function ScreeningTab({ screenings, entityId, entityName, entityType, nationalit
   );
 }
 
-function SourcesList({ sources }: { sources: { name: string; type: string; url: string; result: string }[] }) {
+function SourcesList({ sources }: { sources: { name: string; type: string; url: string; result: string; screenshotUrl?: string | null }[] }) {
   const [showSources, setShowSources] = useState(false);
+  const [previewImg, setPreviewImg] = useState<string | null>(null);
   return (
     <div>
       <button
@@ -659,41 +660,64 @@ function SourcesList({ sources }: { sources: { name: string; type: string; url: 
         className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
       >
         {showSources ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        Sources verifiees ({sources.length})
+        Sources vérifiées ({sources.length})
+        {sources.some((s) => s.screenshotUrl) && <span className="text-[8px] text-emerald-600 ml-1">📷 captures</span>}
       </button>
       {showSources && (
         <div className="mt-1.5 rounded-md border border-border bg-card">
           <div className="divide-y divide-border/50">
             {sources.map((src, i) => {
               const isMatch = src.result.toLowerCase().includes("match") && !src.result.toLowerCase().includes("aucun");
-              const isClean = src.result.toLowerCase().includes("aucun") || src.result.toLowerCase().includes("no match") || src.result.toLowerCase().includes("negatif");
+              const isClean = src.result.toLowerCase().includes("aucun") || src.result.toLowerCase().includes("no match") || src.result.toLowerCase().includes("négatif") || src.result.toLowerCase().includes("negatif");
               return (
-                <div key={i} className="flex items-center justify-between px-4 py-1.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={cn("h-1.5 w-1.5 rounded-full shrink-0",
-                      isMatch ? "bg-red-500" : isClean ? "bg-emerald-500" : "bg-amber-500"
-                    )} />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
+                <div key={i} className="px-4 py-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0",
+                        isMatch ? "bg-red-500" : isClean ? "bg-emerald-500" : "bg-amber-500"
+                      )} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <a href={src.url} target="_blank" rel="noopener noreferrer"
+                            className="text-[11px] text-foreground hover:underline truncate">
+                            {src.name}
+                          </a>
+                          <span className="shrink-0 rounded bg-muted px-1 py-px text-[8px] text-muted-foreground">
+                            {src.type === "pep_database" ? "PEP" : src.type === "sanctions_list" ? "Sanctions" : src.type === "media" ? "Média" : src.type === "registry" ? "Registre" : src.type === "fatf" ? "GAFI" : "Autre"}
+                          </span>
+                          {src.screenshotUrl && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPreviewImg(previewImg === src.screenshotUrl ? null : (src.screenshotUrl ?? null)); }}
+                              className="shrink-0 rounded bg-blue-50 px-1 py-px text-[7px] text-blue-600 hover:bg-blue-100"
+                            >
+                              📷 Capture
+                            </button>
+                          )}
+                        </div>
                         <a href={src.url} target="_blank" rel="noopener noreferrer"
-                          className="text-[11px] text-foreground hover:underline truncate">
-                          {src.name}
+                          className="text-[9px] text-muted-foreground hover:underline truncate block">
+                          {src.url}
                         </a>
-                        <span className="shrink-0 rounded bg-muted px-1 py-px text-[8px] text-muted-foreground">
-                          {src.type === "pep_database" ? "PEP" : src.type === "sanctions_list" ? "Sanctions" : src.type === "media" ? "Media" : src.type === "registry" ? "Registre" : src.type === "fatf" ? "GAFI" : "Autre"}
-                        </span>
                       </div>
-                      <a href={src.url} target="_blank" rel="noopener noreferrer"
-                        className="text-[9px] text-muted-foreground hover:underline truncate block">
-                        {src.url}
-                      </a>
                     </div>
+                    <span className={cn("shrink-0 text-[9px] ml-2",
+                      isMatch ? "text-red-600 font-medium" : isClean ? "text-emerald-600" : "text-amber-600"
+                    )}>
+                      {src.result}
+                    </span>
                   </div>
-                  <span className={cn("shrink-0 text-[9px] ml-2",
-                    isMatch ? "text-red-600 font-medium" : isClean ? "text-emerald-600" : "text-amber-600"
-                  )}>
-                    {src.result}
-                  </span>
+                  {/* Screenshot preview */}
+                  {previewImg === src.screenshotUrl && src.screenshotUrl && (
+                    <div className="mt-1.5 rounded border border-border overflow-hidden">
+                      <a href={src.screenshotUrl} target="_blank" rel="noopener noreferrer">
+                        <img src={src.screenshotUrl} alt={`Capture ${src.name}`} className="w-full h-auto max-h-[300px] object-cover object-top" />
+                      </a>
+                      <div className="flex items-center justify-between bg-muted/30 px-2 py-1">
+                        <span className="text-[8px] text-muted-foreground">Capture écran — {src.name}</span>
+                        <a href={src.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-[8px] text-blue-600 hover:underline">Ouvrir en grand</a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

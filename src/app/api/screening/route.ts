@@ -124,11 +124,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Take screenshots of key sources (top 5 most relevant)
+    let screenshotsMap: Record<string, string> = {};
+    try {
+      const { takeScreenshots } = await import("@/lib/screenshot");
+      const keyUrls = mergedSources
+        .filter((s) => s.url.startsWith("http"))
+        .slice(0, 5)
+        .map((s) => ({ url: s.url, label: s.name }));
+
+      if (keyUrls.length > 0) {
+        console.log(`[Screening] Taking ${keyUrls.length} screenshots...`);
+        const shots = await takeScreenshots(keyUrls, entityId);
+        for (const shot of shots) {
+          if (shot.screenshotUrl) {
+            screenshotsMap[shot.url] = shot.screenshotUrl;
+          }
+        }
+        console.log(`[Screening] ${Object.keys(screenshotsMap).length} screenshots captured`);
+      }
+    } catch (err) {
+      console.log("[Screening] Screenshots skipped:", err instanceof Error ? err.message : "error");
+    }
+
+    // Attach screenshot URLs to sources
+    const sourcesWithScreenshots = mergedSources.map((s) => ({
+      ...s,
+      screenshotUrl: screenshotsMap[s.url] ?? null,
+    }));
+
     // Build full result payload
     const fullPayload = {
       summary: result.summary,
       recommendations: result.recommendations,
-      sourcesChecked: mergedSources,
+      sourcesChecked: sourcesWithScreenshots,
       countryRisk: result.countryRisk,
       overallRisk: result.overallRisk,
       confidence: result.confidence,
@@ -242,7 +271,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
-      sourcesChecked: mergedSources, // Override with our direct search URLs
+      sourcesChecked: sourcesWithScreenshots,
       screeningsSaved: screeningsToSave.length,
     });
   } catch (error) {
