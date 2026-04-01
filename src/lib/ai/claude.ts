@@ -210,60 +210,113 @@ export async function extractIdentity(imageBase64: string, mediaType?: string): 
   placeOfBirth: string | null;
   gender: string | null;
   documentLanguage: string | null;
+  issuingCountry: string | null;
   confidence: number;
   warnings: string[];
 }> {
-  const result = await callClaude(
-    "extract",
-    `Tu es un expert en extraction de documents d'identité internationaux. Tu lis TOUTES les langues : latin, arabe, cyrillique, chinois, japonais, coréen, hébreu, thaï, hindi, géorgien, arménien, etc.
+  const systemPrompt = `Tu es un système OCR expert spécialisé dans l'extraction de documents d'identité officiels. Tu as été entraîné sur des millions de passeports, CNI, titres de séjour et permis de conduire du monde entier.
 
-LANGUES ET DOCUMENTS BILINGUES :
-- Beaucoup de documents d'identité sont bilingues (ex: passeport marocain = arabe + français, passeport émirien = arabe + anglais, passeport chinois = chinois + anglais).
-- Utilise la ZONE MRZ (Machine Readable Zone) en bas du document pour vérifier/confirmer les données extraites du texte visuel.
-- Si le document a du texte en 2 langues, extrais les données de la version en CARACTÈRES LATINS quand disponible. Sinon, translittère en caractères latins.
-- Pour les noms en arabe/chinois/cyrillique : utilise la translittération officielle visible sur le document (souvent dans le MRZ ou en 2ème langue). Ne translittère PAS toi-même si une version latine est déjà sur le doc.
+MÉTHODOLOGIE — suis ces étapes dans l'ordre :
 
-RÈGLES D'EXTRACTION :
-- firstName : TOUS les prénoms tels qu'écrits sur le document, séparés par des espaces. Exemple : "Mohammed Ahmed" ou "Jean Pierre Marie". Ne JAMAIS tronquer.
-- lastName : Nom de famille COMPLET. Si le nom contient des particules (von, de, al-, bin, etc.), les inclure.
-- dateOfBirth : Format JJ/MM/AAAA. Convertir depuis tout format (MM/DD/YYYY américain, YYYY/MM/DD asiatique, etc.).
-- documentExpiry : Date d'expiration COMPLÈTE au format JJ/MM/AAAA. Si seuls mois/année visibles, mettre "01/MM/AAAA".
-- nationality : Code ISO 2 lettres. Utilise le code du MRZ si disponible, sinon déduis du pays émetteur.
-- documentLanguage : La ou les langues du document (ex: "ar+fr" pour arabe+français, "zh+en" pour chinois+anglais, "fr" pour français seul).
-- Ne PAS inventer de données. Si illisible, mets null.
+ÉTAPE 1 — IDENTIFIER LE TYPE DE DOCUMENT
+Regarde l'apparence générale : format, couleur, sécurité visible.
+- Passeport : livret, page avec photo, MRZ en bas (2 lignes de 44 caractères ou 3 lignes de 30)
+- CNI / Carte d'identité : format carte de crédit ou plus grand, recto parfois verso
+- Titre de séjour : souvent format carte, mentions "titre de séjour" ou "residence permit"
+- Permis de conduire : format carte, mentions "permis" ou "driving licence"
 
-Réponds UNIQUEMENT en JSON :
-{
-  "firstName": "TOUS les prénoms en caractères latins",
-  "lastName": "NOM COMPLET en caractères latins",
-  "dateOfBirth": "JJ/MM/AAAA",
-  "nationality": "CODE ISO 2 lettres",
-  "documentNumber": "numéro exact du document",
-  "documentExpiry": "JJ/MM/AAAA",
-  "documentType": "passport|national_id|residence_permit|driving_license",
-  "placeOfBirth": "ville/lieu de naissance en caractères latins",
-  "gender": "M|F ou null",
-  "documentLanguage": "codes langues séparés par + (ex: ar+fr)",
-  "confidence": 0-100,
-  "warnings": ["liste de problèmes"]
-}
+ÉTAPE 2 — LIRE LE MRZ (si présent)
+Le MRZ (Machine Readable Zone) est la source la plus fiable. Structure :
+- Ligne 1 : Type (P=passeport, I=ID) + Pays émetteur (3 lettres) + Nom<<Prénoms
+- Ligne 2 : N° document + Nationalité + Date naissance (AAMMJJ) + Sexe + Date expiration (AAMMJJ)
+Utilise le MRZ comme RÉFÉRENCE PRINCIPALE et compare avec le texte visuel.
 
-Warnings automatiques :
-- Document expiré : "Document expiré depuis le JJ/MM/AAAA"
-- Expire dans moins de 3 mois : "Document expire bientôt (JJ/MM/AAAA)"
-- Qualité insuffisante : "Document de mauvaise qualité — certains champs illisibles"
-- Incohérence MRZ : "Incohérence entre le MRZ et les données visuelles"
-- Translittération incertaine : "Nom translittéré — vérifier l'orthographe"`,
-    "Extrais toutes les informations de ce document d'identité. Le document peut être dans N'IMPORTE QUELLE LANGUE. Prends TOUS les prénoms. Utilise le MRZ si disponible.",
-    imageBase64,
-    mediaType,
-  );
+ÉTAPE 3 — LIRE LES CHAMPS VISUELS
+Lis chaque champ imprimé sur le document. Les labels courants :
+- FR : Nom, Prénom(s), Né(e) le, Nationalité, N°, Date d'expiration, Sexe, Lieu de naissance
+- EN : Surname, Given names, Date of birth, Nationality, Document No, Date of expiry, Sex, Place of birth
+- Si bilingue, privilégie la version en caractères latins.
 
+ÉTAPE 4 — CROSS-VÉRIFIER
+Compare MRZ vs texte visuel. Si incohérence, signale-la en warning et privilégie le MRZ.
+
+RÈGLES STRICTES :
+1. firstName = TOUS les prénoms, séparés par des espaces. "Jean Pierre Marie" pas "Jean". Regarde le champ "Prénom(s)" ou "Given name(s)" — prends TOUT ce qui est écrit.
+2. lastName = Nom de famille COMPLET avec particules (de, von, al-, bin, el-).
+3. dateOfBirth = JJ/MM/AAAA. Le MRZ utilise AAMMJJ → convertis.
+4. documentExpiry = JJ/MM/AAAA. Même conversion depuis le MRZ.
+5. nationality = Code ISO 2 lettres (FR, GB, US...). Le MRZ utilise 3 lettres (FRA, GBR) → convertis en 2.
+6. documentNumber = Le numéro EXACT. Souvent alphanumérique.
+7. Si un champ est ILLISIBLE ou ABSENT → null. Ne JAMAIS inventer.
+
+Réponds UNIQUEMENT avec ce JSON, rien d'autre :
+{"firstName":"...","lastName":"...","dateOfBirth":"JJ/MM/AAAA","nationality":"XX","documentNumber":"...","documentExpiry":"JJ/MM/AAAA","documentType":"passport|national_id|residence_permit|driving_license","placeOfBirth":"...","gender":"M|F","documentLanguage":"xx+yy","issuingCountry":"XX","confidence":0,"warnings":[]}`;
+
+  const userMessage = `Analyse ce document d'identité. Suis la méthodologie : 1) identifie le type, 2) lis le MRZ si présent, 3) lis les champs visuels, 4) cross-vérifie. Extrais TOUS les prénoms sans exception.`;
+
+  // First attempt
+  let result = await callClaude("extract", systemPrompt, userMessage, imageBase64, mediaType);
+
+  let parsed: Record<string, unknown> | null = null;
   try {
-    return JSON.parse(result.text);
+    parsed = JSON.parse(result.text);
   } catch {
-    return { firstName: null, lastName: null, dateOfBirth: null, nationality: null, documentNumber: null, documentExpiry: null, documentType: null, placeOfBirth: null, gender: null, documentLanguage: null, confidence: 0, warnings: ["Extraction échouée"] };
+    // Retry once if JSON parse fails
+    console.log("[Identity Extract] JSON parse failed, retrying...");
+    result = await callClaude("extract", systemPrompt, userMessage + " IMPORTANT: ta réponse précédente n'était pas du JSON valide. Réponds UNIQUEMENT avec un objet JSON, sans texte autour.", imageBase64, mediaType);
+    try {
+      parsed = JSON.parse(result.text);
+    } catch {
+      console.error("[Identity Extract] Second attempt also failed");
+    }
   }
+
+  if (!parsed) {
+    return { firstName: null, lastName: null, dateOfBirth: null, nationality: null, documentNumber: null, documentExpiry: null, documentType: null, placeOfBirth: null, gender: null, documentLanguage: null, issuingCountry: null, confidence: 0, warnings: ["Extraction échouée — le document n'a pas pu être lu"] };
+  }
+
+  // Post-processing: normalize data
+  const data = parsed as Record<string, string | number | string[] | null>;
+
+  // Normalize nationality from 3-letter to 2-letter ISO
+  let nationality = data.nationality as string | null;
+  if (nationality && nationality.length === 3) {
+    const iso3to2: Record<string, string> = { FRA: "FR", GBR: "GB", USA: "US", DEU: "DE", ITA: "IT", ESP: "ES", CHE: "CH", MCO: "MC", RUS: "RU", CHN: "CN", JPN: "JP", MAR: "MA", TUN: "TN", DZA: "DZ", LBN: "LB", ARE: "AE", SAU: "SA", BRA: "BR", PRT: "PT", BEL: "BE", NLD: "NL", LUX: "LU", AUT: "AT", POL: "PL", ROU: "RO", UKR: "UA", TUR: "TR", IND: "IN", PAK: "PK", BGD: "BD", EGY: "EG", GRC: "GR", SRB: "RS", HRV: "HR", BGR: "BG", HUN: "HU", CZE: "CZ", SWE: "SE", NOR: "NO", DNK: "DK", FIN: "FI", IRL: "IE", ISR: "IL", ARG: "AR", COL: "CO", PER: "PE", CHL: "CL", MEX: "MX", CAN: "CA", AUS: "AU", NZL: "NZ", ZAF: "ZA", NGA: "NG", KEN: "KE", GHA: "GH", SEN: "SN", CIV: "CI", CMR: "CM", COD: "CD", AGO: "AO", MOZ: "MZ", MDG: "MG" };
+    nationality = iso3to2[nationality] ?? nationality.slice(0, 2);
+  }
+
+  // Build warnings
+  const warnings: string[] = Array.isArray(data.warnings) ? data.warnings as string[] : [];
+
+  // Check expiry
+  const expiry = data.documentExpiry as string | null;
+  if (expiry && /^\d{2}\/\d{2}\/\d{4}$/.test(expiry)) {
+    const [d, m, y] = expiry.split("/").map(Number);
+    const expiryDate = new Date(y, m - 1, d);
+    const now = new Date();
+    const threeMonths = new Date(now.getTime() + 90 * 86400000);
+    if (expiryDate < now && !warnings.some((w) => w.includes("expiré"))) {
+      warnings.push(`Document expiré depuis le ${expiry}`);
+    } else if (expiryDate < threeMonths && !warnings.some((w) => w.includes("expire"))) {
+      warnings.push(`Document expire bientôt (${expiry})`);
+    }
+  }
+
+  return {
+    firstName: (data.firstName as string) || null,
+    lastName: (data.lastName as string) || null,
+    dateOfBirth: (data.dateOfBirth as string) || null,
+    nationality,
+    documentNumber: (data.documentNumber as string) || null,
+    documentExpiry: expiry || null,
+    documentType: (data.documentType as string) || null,
+    placeOfBirth: (data.placeOfBirth as string) || null,
+    gender: (data.gender as string) || null,
+    documentLanguage: (data.documentLanguage as string) || null,
+    issuingCountry: (data.issuingCountry as string) || nationality || null,
+    confidence: typeof data.confidence === "number" ? data.confidence : 0,
+    warnings,
+  };
 }
 
 // =============================================================================
