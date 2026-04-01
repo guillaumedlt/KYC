@@ -27,21 +27,36 @@ export function PersonIdentityStep({
   const [extracted, setExtracted] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function processFile(file: File) {
+  async function processFile(file: File) {
     if (!file) return;
-    update({ documentFile: file });
 
-    // AI extracts EVERYTHING via Claude Vision
+    // Validate file
+    if (file.size > 20 * 1024 * 1024) {
+      setError("Fichier trop volumineux (max 20 Mo)");
+      return;
+    }
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!validTypes.includes(file.type)) {
+      setError("Format non supporté. Utilisez JPG, PNG ou PDF.");
+      return;
+    }
+
+    update({ documentFile: file });
     setAnalyzing(true);
     setExtracted(false);
+    setError(null);
 
-    // Convert file to base64 for Claude Vision
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      const result = await aiExtractIdentity(base64);
+    try {
+      const base64 = await fileToBase64(file);
+
+      // Call AI with timeout
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000));
+      const extractPromise = aiExtractIdentity(base64, file.type);
+      const result = await Promise.race([extractPromise, timeoutPromise]);
 
       if (result && result.confidence > 0) {
         update({
@@ -65,19 +80,24 @@ export function PersonIdentityStep({
         });
         setExtracted(true);
       } else {
-        // Fallback if AI fails
-        update({ aiWarnings: ["L'extraction IA a échoué. Veuillez remplir manuellement."] });
+        // AI failed or timed out — let user fill manually
+        setError(result === null
+          ? "L'analyse a pris trop de temps. Remplissez manuellement."
+          : "L'extraction IA n'a pas pu lire ce document. Remplissez manuellement."
+        );
         setEditMode(true);
         setExtracted(true);
+        update({
+          aiExtractions: { ...data.aiExtractions, identity_confidence: "0" },
+        });
       }
+    } catch (err) {
+      setError("Erreur lors de l'analyse. Remplissez manuellement.");
+      setEditMode(true);
+      setExtracted(true);
+    } finally {
       setAnalyzing(false);
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -86,18 +106,6 @@ export function PersonIdentityStep({
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(true);
-  }
-
-  function handleDragLeave(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
   }
 
   const canProceed = extracted && data.firstName && data.lastName;
@@ -111,17 +119,17 @@ export function PersonIdentityStep({
         </p>
       </div>
 
-      {/* Document upload — drag & drop + click */}
+      {/* Upload zone */}
       <div
-        onClick={() => fileRef.current?.click()}
+        onClick={() => !analyzing && fileRef.current?.click()}
         onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
         className={cn(
           "flex cursor-pointer flex-col items-center gap-4 rounded-md border-2 border-dashed px-6 py-8 transition-all",
-          analyzing ? "border-foreground/30 bg-muted/20" :
+          analyzing ? "cursor-wait border-foreground/30 bg-muted/20" :
           dragOver ? "border-foreground bg-foreground/5 scale-[1.01]" :
-          data.documentFile ? "border-emerald-300 bg-emerald-50/50" :
+          data.documentFile && extracted ? "border-emerald-300 bg-emerald-50/50" :
           "border-border hover:border-foreground/20 hover:bg-muted/10",
         )}
       >
@@ -131,28 +139,24 @@ export function PersonIdentityStep({
             <div className="text-center">
               <p className="text-[13px] font-medium text-foreground">Analyse IA en cours...</p>
               <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
-                <p>OCR du document...</p>
-                <p>Détection nationalité et pays de résidence...</p>
-                <p>Extraction nom, prénom, date de naissance...</p>
-                <p>Vérification MRZ et validité...</p>
-                <p>Screening PEP préliminaire...</p>
+                <p>Lecture du document...</p>
+                <p>Extraction des informations...</p>
               </div>
+              <p className="mt-2 text-[10px] text-muted-foreground/60">Peut prendre jusqu&apos;à 15 secondes</p>
             </div>
           </>
-        ) : data.documentFile ? (
+        ) : data.documentFile && extracted ? (
           <>
             <CheckCircle className="h-8 w-8 text-emerald-600" />
             <div className="text-center">
               <p className="text-[13px] font-medium text-foreground">{data.documentFile.name}</p>
-              <p className="mt-0.5 text-[11px] text-emerald-600">Analysé avec succès · Cliquez pour remplacer</p>
+              <p className="mt-0.5 text-[11px] text-emerald-600">Analysé · Cliquez pour remplacer</p>
             </div>
           </>
         ) : dragOver ? (
           <>
             <Upload className="h-8 w-8 text-foreground" />
-            <div className="text-center">
-              <p className="text-[13px] font-medium text-foreground">Déposez ici</p>
-            </div>
+            <p className="text-[13px] font-medium">Déposez ici</p>
           </>
         ) : (
           <>
@@ -160,24 +164,34 @@ export function PersonIdentityStep({
             <div className="text-center">
               <p className="text-[13px] font-medium text-foreground">Glissez-déposez le document d&apos;identité</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">Passeport, carte d&apos;identité ou titre de séjour</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground/60">ou cliquez pour parcourir · PDF, JPG, PNG — max 20 Mo</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground/60">ou cliquez · JPG, PNG, PDF — max 20 Mo</p>
             </div>
           </>
         )}
-        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleInputChange} className="hidden" />
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }} className="hidden" />
       </div>
 
-      {/* AI extracted results — all auto-filled, editable on demand */}
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-md bg-amber-50 px-4 py-2.5 text-[11px] text-amber-700">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {error}
+        </div>
+      )}
+
+      {/* AI extracted results */}
       {extracted && (
         <div className="rounded-md border border-border bg-card">
-          {/* Header with confidence + edit toggle */}
           <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <div className="flex items-center gap-2">
               <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Extraction IA</span>
-              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-data text-[10px] font-medium text-emerald-600">
-                {data.aiExtractions.identity_confidence}% confiance
+              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                {data.aiExtractions.identity_confidence !== "0" ? "Extraction IA" : "Saisie manuelle"}
               </span>
+              {data.aiExtractions.identity_confidence && data.aiExtractions.identity_confidence !== "0" && (
+                <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-data text-[10px] font-medium text-emerald-600">
+                  {data.aiExtractions.identity_confidence}%
+                </span>
+              )}
             </div>
             <button
               onClick={() => setEditMode(!editMode)}
@@ -189,50 +203,23 @@ export function PersonIdentityStep({
             </button>
           </div>
 
-          {/* Fields */}
           <div className="divide-y divide-border/50">
-            <FieldRow label="Type de document" value={data.documentType === "passport" ? "Passeport" : data.documentType === "national_id" ? "Carte d'identité" : "Titre de séjour"} editing={false} />
-            <FieldRow label="Nationalité" value={FLAGS[data.nationality] ?? data.nationality} editing={editMode}
-              onEdit={(v) => update({ nationality: v })} editValue={data.nationality} />
-            <FieldRow label="Pays de résidence" value={FLAGS[data.residence] ?? data.residence} editing={editMode}
-              onEdit={(v) => update({ residence: v })} editValue={data.residence} />
             <FieldRow label="Prénom" value={data.firstName} editing={editMode} onEdit={(v) => update({ firstName: v })} />
             <FieldRow label="Nom" value={data.lastName} editing={editMode} onEdit={(v) => update({ lastName: v })} />
             <FieldRow label="Date de naissance" value={data.dateOfBirth} mono editing={editMode} onEdit={(v) => update({ dateOfBirth: v })} />
+            <FieldRow label="Nationalité" value={data.nationality ? (FLAGS[data.nationality] ?? data.nationality) : ""} editing={editMode} onEdit={(v) => update({ nationality: v })} editValue={data.nationality} />
+            <FieldRow label="Résidence" value={data.residence ? (FLAGS[data.residence] ?? data.residence) : ""} editing={editMode} onEdit={(v) => update({ residence: v })} editValue={data.residence} />
             <FieldRow label="N° document" value={data.documentNumber} mono editing={editMode} onEdit={(v) => update({ documentNumber: v })} />
             <FieldRow label="Expiration" value={data.documentExpiry} mono editing={editMode} onEdit={(v) => update({ documentExpiry: v })} />
           </div>
 
-          {/* Verifications */}
-          <div className="border-t border-border px-4 py-2">
-            <div className="space-y-1">
-              {data.aiExtractions.mrz_valid === "true" && (
-                <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
-                  <CheckCircle className="h-3 w-3" /> MRZ vérifié — cohérent avec les champs
-                </div>
-              )}
+          {data.aiExtractions.identity_confidence && data.aiExtractions.identity_confidence !== "0" && (
+            <div className="border-t border-border px-4 py-2">
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
-                <CheckCircle className="h-3 w-3" /> Document non expiré (valid. {data.documentExpiry})
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
-                <CheckCircle className="h-3 w-3" /> Nationalité et résidence détectées
+                <CheckCircle className="h-3 w-3" /> Document analysé avec succès
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Biometric verification */}
-      {extracted && (
-        <div className="rounded-md border border-dashed border-border bg-card px-5 py-4">
-          <div className="flex items-center gap-3">
-            <Camera className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-[12px] font-medium text-foreground">Vérification biométrique</p>
-              <p className="text-[11px] text-muted-foreground">Selfie + comparaison faciale avec le document</p>
-            </div>
-            <Button size="sm" className="ml-auto h-7 rounded-md px-3 text-[11px]">Lancer</Button>
-          </div>
+          )}
         </div>
       )}
 
@@ -259,25 +246,30 @@ export function PersonIdentityStep({
 function FieldRow({
   label, value, mono, editing, onEdit, editValue,
 }: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  editing: boolean;
-  onEdit?: (v: string) => void;
-  editValue?: string;
+  label: string; value: string; mono?: boolean; editing: boolean;
+  onEdit?: (v: string) => void; editValue?: string;
 }) {
   return (
     <div className="flex items-center justify-between px-4 py-2">
       <span className="w-40 shrink-0 text-[11px] text-muted-foreground">{label}</span>
       {editing && onEdit ? (
-        <input
-          value={editValue ?? value}
-          onChange={(e) => onEdit(e.target.value)}
-          className={cn("flex-1 rounded-md border border-border bg-background px-2 py-1 text-right text-[12px] focus:border-foreground/30 focus:outline-none", mono && "font-data")}
-        />
+        <input value={editValue ?? value} onChange={(e) => onEdit(e.target.value)}
+          className={cn("flex-1 rounded-md border border-border bg-background px-2 py-1 text-right text-[12px] focus:border-foreground/30 focus:outline-none", mono && "font-data")} />
       ) : (
         <span className={cn("text-right text-[12px] text-foreground", mono && "font-data")}>{value || "—"}</span>
       )}
     </div>
   );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }

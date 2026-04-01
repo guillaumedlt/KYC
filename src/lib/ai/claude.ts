@@ -140,7 +140,7 @@ export async function classifyDocument(fileName: string, textContent?: string): 
 // IDENTITY EXTRACTION — Sonnet (vision capable)
 // =============================================================================
 
-export async function extractIdentity(imageBase64: string): Promise<{
+export async function extractIdentity(imageBase64: string, mediaType?: string): Promise<{
   firstName: string | null;
   lastName: string | null;
   dateOfBirth: string | null;
@@ -171,6 +171,7 @@ Réponds UNIQUEMENT en JSON avec ces champs:
 Si un champ n'est pas lisible, mets null. Ajoute un warning si le document expire dans moins de 3 mois.`,
     "Extrais toutes les informations de ce document d'identité.",
     imageBase64,
+    mediaType,
   );
 
   try {

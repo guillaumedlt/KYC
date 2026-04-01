@@ -6,9 +6,9 @@ import { extractIdentity, extractAddress, extractFundsSource, extractCompanyDocu
  * Extract identity from an uploaded document image.
  * Uses Claude Sonnet with vision — ~$0.01 per call.
  */
-export async function aiExtractIdentity(base64: string) {
+export async function aiExtractIdentity(base64: string, mediaType?: string) {
   try {
-    return await extractIdentity(base64);
+    return await extractIdentity(base64, mediaType);
   } catch (error) {
     console.error("AI identity extraction failed:", error);
     return null;
