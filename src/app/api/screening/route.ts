@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { screenEntity } from "@/lib/ai/claude";
-import { createClient as createServerClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
-function getSupabase() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
 
     const body = await request.json();
     const { entityId, screeningType } = body;
@@ -262,7 +255,7 @@ export async function POST(request: NextRequest) {
 // PATCH — Manual review of a screening
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
 
     const body = await request.json();
     const { screeningId, decision } = body;
