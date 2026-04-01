@@ -199,6 +199,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save screenings to DB — REPLACE existing ones (don't accumulate)
+    console.log(`[Screening] Saving ${screeningsToSave.length} screenings, mergedSources count: ${mergedSources.length}`);
     for (const screening of screeningsToSave) {
       // Delete previous screening of same type for same entity
       await supabase.from("screenings")
@@ -207,7 +208,8 @@ export async function POST(request: NextRequest) {
         .eq("screening_type", screening.screening_type);
 
       // Insert new one
-      await supabase.from("screenings").insert(screening);
+      const { error: insertErr } = await supabase.from("screenings").insert(screening);
+      if (insertErr) console.error(`[Screening] Insert failed for ${screening.screening_type}:`, insertErr.message);
     }
 
     // Log activity
@@ -242,6 +244,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
+      sourcesChecked: mergedSources, // Override with our direct search URLs
       screeningsSaved: screeningsToSave.length,
     });
   } catch (error) {
